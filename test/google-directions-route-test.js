@@ -1,5 +1,7 @@
-describe('GoogleDirectionsRoute', function() {
-  it('creates a google.maps.DirectionsRoute-like object from Hopstop directions', function() {
+require('./helper');
+
+vows.describe('GoogleDirectionsRoute').addBatch({
+  'creates a google.maps.DirectionsRoute-like object from Hopstop directions': function() {
     var route = new GoogleDirectionsRoute(HopStopResult.realSubway);
     expect(route.bounds).toBeInstanceOf(google.maps.LatLngBounds)
     expect(route.copyrights).toContain('HopStop');
@@ -10,8 +12,8 @@ describe('GoogleDirectionsRoute', function() {
     // expect(route.waypoint_order).toBe([0,1,2,3]);
   });
 
-  describe('.generateOverviewPath', function() {
-    it('converts steps into an array of LatLngs', function() {
+  '.generateOverviewPath': {
+    'converts steps into an array of LatLngs': function() {
       var path = GoogleDirectionsRoute.generateOverviewPath(HopStopResult.realSubway.steps);
       expect(path[0].lat()).toBeClose(40.6819, 0.000001);
       expect(path[0].lng()).toBeClose(-73.90871, 0.000001);
@@ -24,8 +26,8 @@ describe('GoogleDirectionsRoute', function() {
     });
   });
 
-  describe('.generateBounds', function() {
-    it('gets a southWest corner and a northEast corner', function() {
+  '.generateBounds': {
+    'gets a southWest corner and a northEast corner': function() {
       var bounds = GoogleDirectionsRoute.generateBounds(HopStopResult.realSubway.steps);
       expect(bounds.getNorthEast().lat()).toBeClose(40.746824, 0.000001);
       expect(bounds.getNorthEast().lng()).toBeClose(-73.90871, 0.000001);
@@ -34,8 +36,8 @@ describe('GoogleDirectionsRoute', function() {
     });
   });
 
-  describe('.generateSteps', function() {
-    it('returns an array of DirectionSteps', function() {
+  '.generateSteps': {
+    'returns an array of DirectionSteps': function() {
       var steps = GoogleDirectionsRoute.generateSteps(HopStopResult.realSubway.steps);
       expect(steps.length).toBe(5);
       expect(steps[0].duration.value).toBe(32400);

@@ -1,4 +1,6 @@
-describe('RouteView', function() {
+require('./helper');
+
+vows.describe('RouteView').addBatch({
   var routeView;
 
   beforeEach(function() {
@@ -10,16 +12,16 @@ describe('RouteView', function() {
     routeView = new RouteView(controller, 'DRIVING');
   });
 
-  describe('#updateDirections', function() {
-    it('updates the #route div with directions', function() {
+  '#updateDirections': {
+    'updates the #route div with directions': function() {
       setFixtures('<div id="routing"><div class="driving"></div></div>');
       routeView.updateDirections();
       expect($('#routing .driving').html()).toContain('Go there');
     });
   });
 
-  describe('#updateSegmentEmissions', function() {
-    it('updates the emissions of a segment', function() {
+  '#updateSegmentEmissions': {
+    'updates the emissions of a segment': function() {
       setFixtures('<div id="routing"><div class="driving"></div></div>');
       routeView.updateDirections();
       var emissionEstimate = {

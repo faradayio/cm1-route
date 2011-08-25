@@ -1,14 +1,16 @@
-describe('DrivingSegment', function() {
-  it('converts distance to kilometers', function() {
+require('./helper');
+
+vows.describe('DrivingSegment').addBatch({
+  'converts distance to kilometers': function() {
     var ds = new DrivingSegment(0, { distance: { value: 3401 } });
     expect(ds.distance).toBeClose(3.401, 0.0001)
   });
-  it('provides duration', function() {
+  'provides duration': function() {
     var ds = new DrivingSegment(0, { duration: { value: 3401 } });
     expect(ds.duration).toBe(3401);
   });
 
-  describe('#getEmissionEstimateWithSegment', function() {
+  '#getEmissionEstimateWithSegment': {
     var emissions, segment;
     beforeEach(function() {
       fakeAjax({
@@ -23,10 +25,10 @@ describe('DrivingSegment', function() {
       });
     });
 
-    it('passes a segment parameter', function() {
+    'passes a segment parameter': function() {
       expect(segment.index).toBe(0);
     });
-    it('passes an emissions parameter', function() {
+    'passes an emissions parameter': function() {
       expect(emissions).toBe(6.8);
     });
   });

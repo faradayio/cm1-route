@@ -1,4 +1,6 @@
-describe("MapView", function() {
+require('./helper');
+
+vows.describe("MapView").addBatch({
   var map;
 
   beforeEach(function() {
@@ -6,8 +8,8 @@ describe("MapView", function() {
     mapView = new MapView('#mapdiv');
   });
 
-  describe('#canvas', function() {
-    it('returns the map div', function() {
+  '#canvas': {
+    'returns the map div': function() {
       expect(mapView.canvas()).toBe('div#mapdiv');
     });
   });

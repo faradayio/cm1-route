@@ -1,4 +1,6 @@
-describe('Directions', function() {
+require('./helper');
+
+vows.describe('Directions').addBatch({
   var directions
 
   beforeEach(function() {
@@ -18,27 +20,27 @@ describe('Directions', function() {
     });
   })
 
-  describe('.create', function() {
-    it('creates HopStopDirections', function() {
+  '.create': {
+    'creates HopStopDirections': function() {
       var dir = Directions.create('A','B','PUBLICTRANSIT', 'today')
       expect(dir).toBeInstanceOf(HopStopDirections)
     })
-    it('creates GoogleDirections for Driving', function() {
+    'creates GoogleDirections for Driving': function() {
       var dir = Directions.create('A','B','DRIVING')
       expect(dir).toBeInstanceOf(GoogleDirections)
     })
-    it('creates GoogleDirections for Walking', function() {
+    'creates GoogleDirections for Walking': function() {
       var dir = Directions.create('A','B','WALKING')
       expect(dir).toBeInstanceOf(GoogleDirections)
     })
-    it('creates GoogleDirections for Bicycling', function() {
+    'creates GoogleDirections for Bicycling': function() {
       var dir = Directions.create('A','B','BICYCLING')
       expect(dir).toBeInstanceOf(GoogleDirections)
     })
   })
 
-  describe('#segments', function() {
-    it('returns an array of segments', function() {
+  '#segments': {
+    'returns an array of segments': function() {
       var segments = directions.segments()
 
       expect(segments[0].distance).toEqual(0.688)
@@ -55,8 +57,8 @@ describe('Directions', function() {
     })
   })
 
-  describe('#getEmissions', function() {
-    it('gets emissions for all segments', function() {
+  '#getEmissions': {
+    'gets emissions for all segments': function() {
       directions.eachSegment(function(segment) {
         segment.getEmissionEstimateWithSegment = jasmine.createSpy();
       });
@@ -65,7 +67,7 @@ describe('Directions', function() {
         expect(segment.getEmissionEstimateWithSegment).toHaveBeenCalled();
       });
     });
-    it('fires the onFinish event when all segments have calculated emissions', function() {
+    'fires the onFinish event when all segments have calculated emissions': function() {
       var onFinish = jasmine.createSpy('onFinish');
 
       directions.getEmissions(function() {}, function() {}, onFinish);
@@ -74,12 +76,12 @@ describe('Directions', function() {
     });
   });
 
-  describe('#onSegmentEmissionsSuccess', function() {
-    it('updates the total emissions', function() {
+  '#onSegmentEmissionsSuccess': {
+    'updates the total emissions': function() {
       directions.getEmissions(function() {}, function() {});
       expect(directions.totalEmissions).toBeClose(98.6, 0.01);
     });
-    it('fires the onFinish event when all segments have calculated emissions', function() {
+    'fires the onFinish event when all segments have calculated emissions': function() {
       var onFinish = jasmine.createSpy('onFinish');
 
       var onner = directions.onSegmentEmissionsSuccess(function() {}, onFinish);
@@ -92,11 +94,11 @@ describe('Directions', function() {
     });
   });
 
-  describe('#totalTime', function() {
-    it("sums each segment's duration and pretty prints the result", function() {
+  '#totalTime': {
+    "sums each segment's duration and pretty prints the result": function() {
       expect(directions.totalTime()).toBe('6 mins');
     });
-    it('returns empty string if there are no segments', function() {
+    'returns empty string if there are no segments': function() {
       directions._segments = [];
       expect(directions.totalTime()).toBe('');
     });

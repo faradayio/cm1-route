@@ -1,5 +1,7 @@
-describe('BicyclingSegment', function() {
-  it('provides duration', function() {
+require('./helper');
+
+vows.describe('BicyclingSegment').addBatch({
+  'provides duration': function() {
     var bicycling = new BicyclingSegment(0, {
       distance: { value: 28.5 },
       duration: { value: 4800 },
@@ -7,7 +9,7 @@ describe('BicyclingSegment', function() {
     expect(bicycling.duration).toBe(4800);
   });
 
-  describe('#getEmissionEstimateWithSegment', function() {
+  '#getEmissionEstimateWithSegment': {
     var emissions, segment;
     beforeEach(function() {
       var bicycling = new BicyclingSegment(0, {
@@ -20,10 +22,10 @@ describe('BicyclingSegment', function() {
       });
     });
 
-    it('passes a segment parameter', function() {
+    'passes a segment parameter': function() {
       expect(segment.index).toBe(0);
     });
-    it('passes an emissions parameter', function() {
+    'passes an emissions parameter': function() {
       expect(emissions).toBe(0);
     });
   });

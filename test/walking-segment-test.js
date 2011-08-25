@@ -1,14 +1,16 @@
-describe('WalkingSegment', function() {
-  it('converts distance to kilometers', function() {
+require('./helper');
+
+vows.describe('WalkingSegment').addBatch({
+  'converts distance to kilometers': function() {
     var ws = new WalkingSegment(0, { distance: { value: 3401 } });
     expect(ws.distance).toBeClose(3.401, 0.0001)
   });
-  it('provides duration', function() {
+  'provides duration': function() {
     var ws = new WalkingSegment(0, { duration: { value: 120 } });
     expect(ws.duration).toBe(120)
   });
-  describe('#getEmissionEstimateWithSegment', function() {
-    it('results in zero emissions', function() {
+  '#getEmissionEstimateWithSegment': {
+    'results in zero emissions': function() {
       var walk = new WalkingSegment(0, {
         distance: { value: 28.5 },
         instructions: 'Go here' });

@@ -1,3 +1,5 @@
+require('./helper');
+
 beforeEach(function() {
   this.addMatchers({
     toBeClose: function(base, deviation) {

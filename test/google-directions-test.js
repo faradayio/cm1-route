@@ -1,16 +1,18 @@
-describe('GoogleDirections', function() {
+require('./helper');
+
+vows.describe('GoogleDirections').addBatch({
   var directions
 
   beforeEach(function() {
     directions = new GoogleDirections('A','B','WALKING')
   })
 
-  it('has a directionsService property', function() {
+  'has a directionsService property': function() {
     expect(directions.directionsService).toBeDefined()
   })
 
-  describe('#steps', function() {
-    it('returns an array of steps', function() {
+  '#steps': {
+    'returns an array of steps': function() {
       directions.directionsResult = GoogleResult.driving
       var steps = directions.steps()
 
