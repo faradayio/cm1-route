@@ -1,0 +1,24 @@
+{
+  "name": "native_route",
+  "version": "0.0.1",
+  "author": "Derek Kastner <dkastner@gmail.com>",
+  "description": "Routing API based on HootRoot",
+  "homepage": "http://github.com/brighterplanet/native_route",
+  "main": "lib/native-route.js",
+  "engine": "*",
+  "files": ["lib"],
+  "dependencies": {
+    "googlemaps": "*",
+  },
+  "devDependencies": {
+    "browserify": "*",
+    "http-browserify": "*",
+    "jsdom": "*",
+    "sinon": "*",
+    "vows": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brighterplanet/native_route.git"
+  }
+}
