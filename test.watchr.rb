@@ -13,7 +13,7 @@ def run(cmd)
 end
 
 def run_all_tests
-  run "vows test/*"
+  run "vows test/*-test.js"
 end
 
 def run_single_test *test
