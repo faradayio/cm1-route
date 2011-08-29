@@ -1,106 +1,91 @@
 require('./helper');
+var Cm1Result = require('./fixtures/cm1-result'),
+    GoogleResult = require('./fixtures/google-result');
+var Directions = require('../lib/directions');
+
+var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+directions.directionsResult = GoogleResult.driving;
+
+var fakeweb = require('fakeweb'),
+    http = require('http');
+http.register_intercept({
+    uri: '/automobile_trips.json', 
+    host: 'carbon.brighterplanet.com',
+    body: JSON.stringify(Cm1Result.fit)
+});
 
 vows.describe('Directions').addBatch({
-  var directions
-
-  beforeEach(function() {
-    directions = Directions.create('Lansing, MI', 'Ann Arbor, MI', 'DRIVING')
-    directions.directionsResult = GoogleResult.driving
-    fakeAjax({
-      urls: {
-        'http://carbon.brighterplanet.com/automobile_trips.json?distance=0.688': {
-          successData: {emission: 6.8}},
-        'http://carbon.brighterplanet.com/automobile_trips.json?distance=0.128': {
-          successData: {emission: 1.2}},
-        'http://carbon.brighterplanet.com/automobile_trips.json?distance=0.045': {
-          successData: {emission: 0.4}},
-        'http://carbon.brighterplanet.com/automobile_trips.json?distance=9.025': {
-          successData: {emission: 90.2}}
-      }
-    });
-  })
-
-  '.create': {
-    'creates HopStopDirections': function() {
-      var dir = Directions.create('A','B','PUBLICTRANSIT', 'today')
-      expect(dir).toBeInstanceOf(HopStopDirections)
-    })
-    'creates GoogleDirections for Driving': function() {
-      var dir = Directions.create('A','B','DRIVING')
-      expect(dir).toBeInstanceOf(GoogleDirections)
-    })
-    'creates GoogleDirections for Walking': function() {
-      var dir = Directions.create('A','B','WALKING')
-      expect(dir).toBeInstanceOf(GoogleDirections)
-    })
-    'creates GoogleDirections for Bicycling': function() {
-      var dir = Directions.create('A','B','BICYCLING')
-      expect(dir).toBeInstanceOf(GoogleDirections)
-    })
-  })
-
   '#segments': {
     'returns an array of segments': function() {
       var segments = directions.segments()
 
-      expect(segments[0].distance).toEqual(0.688)
-      expect(segments[0].index).toEqual(0)
+      assert.isNumber(segments[0].distance);
+      assert.equal(segments[0].index, 0);
 
-      expect(segments[1].distance).toEqual(0.128)
-      expect(segments[1].index).toEqual(1)
+      assert.isNumber(segments[1].distance);
+      assert.equal(segments[1].index, 1);
 
-      expect(segments[2].distance).toEqual(0.045)
-      expect(segments[2].index).toEqual(2)
+      assert.isNumber(segments[2].distance);
+      assert.equal(segments[2].index, 2);
 
-      expect(segments[3].distance).toEqual(9.025)
-      expect(segments[3].index).toEqual(3)
-    })
-  })
+      assert.isNumber(segments[3].distance);
+      assert.equal(segments[3].index, 3);
+    }
+  },
 
   '#getEmissions': {
     'gets emissions for all segments': function() {
+      var spies = [];
       directions.eachSegment(function(segment) {
-        segment.getEmissionEstimateWithSegment = jasmine.createSpy();
+        spies.push(sinon.spy(segment, 'getEmissionEstimateWithSegment'));
       });
-      directions.getEmissions(function() {}, function() {})
-      directions.eachSegment(function(segment) {
-        expect(segment.getEmissionEstimateWithSegment).toHaveBeenCalled();
+      directions.getEmissions(function() {}, function() {});
+      spies.forEach(function(spy) {
+        sinon.assert.called(spy);
       });
-    });
+    },
     'fires the onFinish event when all segments have calculated emissions': function() {
-      var onFinish = jasmine.createSpy('onFinish');
+      var onFinish = sinon.spy();
 
       directions.getEmissions(function() {}, function() {}, onFinish);
 
-      expect(onFinish).toHaveBeenCalledWith(directions);
-    });
-  });
+      sinon.assert.called(onFinish);
+    }
+  },
 
-  '#onSegmentEmissionsSuccess': {
-    'updates the total emissions': function() {
-      directions.getEmissions(function() {}, function() {});
-      expect(directions.totalEmissions).toBeClose(98.6, 0.01);
-    });
-    'fires the onFinish event when all segments have calculated emissions': function() {
-      var onFinish = jasmine.createSpy('onFinish');
+  '.events': {
+    '.onSegmentEmissionsSuccess': {
+      'updates the total emissions': function() {
+        var evt = Directions.events.onSegmentEmissionsSuccess(directions, function() {}, function() {});
+        directions.totalEmissions = 0;
+        evt({}, { value: function() { return 14254.4678; } });
+        assert.approximately(directions.totalEmissions, 14254.46, 0.01);
+      },
+      'fires the onFinish event when all segments have calculated emissions': function() {
+        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+        directions.segmentEmissionsSuccessCount = 0;
+        directions.segments = function() { return [{}, {}, {}, {}]; };
 
-      var onner = directions.onSegmentEmissionsSuccess(function() {}, onFinish);
-      onner(0, { value: function() { return 1; } });
-      onner(1, { value: function() { return 1; } });
-      onner(2, { value: function() { return 1; } });
-      onner(3, { value: function() { return 1; } });
+        var onFinish = sinon.spy();
 
-      expect(onFinish).toHaveBeenCalledWith(directions);
-    });
-  });
+        var onner = Directions.events.onSegmentEmissionsSuccess(directions, function() {}, onFinish);
+        onner(0, { value: function() { return 1; } });
+        onner(1, { value: function() { return 1; } });
+        onner(2, { value: function() { return 1; } });
+        onner(3, { value: function() { return 1; } });
+
+        sinon.assert.calledWithExactly(onFinish, directions);
+      }
+    }
+  },
 
   '#totalTime': {
     "sums each segment's duration and pretty prints the result": function() {
-      expect(directions.totalTime()).toBe('6 mins');
-    });
+      assert.equal(directions.totalTime(), '6 mins');
+    },
     'returns empty string if there are no segments': function() {
       directions._segments = [];
-      expect(directions.totalTime()).toBe('');
-    });
-  });
-});
+      assert.equal(directions.totalTime(), '');
+    }
+  }
+}).export(module);

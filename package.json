@@ -8,10 +8,12 @@
   "engine": "*",
   "files": ["lib"],
   "dependencies": {
-    "googlemaps": "*",
+    "CM1": "*",
+    "googlemaps": "*"
   },
   "devDependencies": {
     "browserify": "*",
+    "fakeweb": "*",
     "http-browserify": "*",
     "jsdom": "*",
     "sinon": "*",

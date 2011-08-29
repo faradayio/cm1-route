@@ -1,14 +1,15 @@
-require('./helper');
+require('../helper');
+var WalkingSegment = require('../../lib/segment/walking-segment');
 
 vows.describe('WalkingSegment').addBatch({
   'converts distance to kilometers': function() {
     var ws = new WalkingSegment(0, { distance: { value: 3401 } });
-    expect(ws.distance).toBeClose(3.401, 0.0001)
-  });
+    assert.approximately(ws.distance, 3.401, 0.0001)
+  },
   'provides duration': function() {
     var ws = new WalkingSegment(0, { duration: { value: 120 } });
-    expect(ws.duration).toBe(120)
-  });
+    assert.equal(ws.duration, 120)
+  },
   '#getEmissionEstimateWithSegment': {
     'results in zero emissions': function() {
       var walk = new WalkingSegment(0, {
@@ -21,8 +22,8 @@ vows.describe('WalkingSegment').addBatch({
         emissions = emissionEstimate.value();
       });
 
-      expect(step.index).toBe(0);
-      expect(emissions).toBe(0);
-    });
-  });
-});
+      assert.equal(step.index, 0);
+      assert.equal(emissions, 0);
+    }
+  }
+}).export(module);
