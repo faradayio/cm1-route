@@ -1,4 +1,4 @@
-require('./helper');
+require('../helper');
 
 var GoogleDirections = require('../../lib/directions/google-directions');
 
