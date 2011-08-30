@@ -6,7 +6,6 @@
   "homepage": "http://github.com/brighterplanet/native_route",
   "main": "lib/native-route.js",
   "engine": "*",
-  "files": ["lib"],
   "dependencies": {
     "CM1": "*",
     "googlemaps": "*"
