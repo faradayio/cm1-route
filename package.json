@@ -8,7 +8,8 @@
   "engine": "*",
   "dependencies": {
     "CM1": "*",
-    "googlemaps": "*"
+    "googlemaps": "*",
+    "querystring": "*"
   },
   "devDependencies": {
     "browserify": "*",
