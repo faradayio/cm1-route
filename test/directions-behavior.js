@@ -49,6 +49,15 @@ module.exports = {
     };
   },
 
+  proviesCalculateDistance: function(directions) {
+    return {
+      'sets #distance to a number value': function() {
+        directions.calculateDistance();
+        assert.isNumber(directions.distance);
+      },
+    };
+  },
+
   geocodedOrigin: [{
     geometry: {
       location: {

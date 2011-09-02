@@ -26,6 +26,7 @@ vows.describe('GoogleDirections').addBatch({
 
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
+  '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
   '#distanceEstimate': {
     'returns a total distance': function() {

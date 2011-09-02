@@ -53,6 +53,11 @@ global.google = {
     },
     DirectionsService: function() {
       this.route = function(result, callback) { callback({}); };
+    },
+    geometry: {
+      spherical: {
+        computeDistanceBetween: function(a, b) { return 764872.7 }
+      }
     }
   }
 };

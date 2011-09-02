@@ -34,29 +34,26 @@ http.register_intercept({
 vows.describe('HopStopDirections').addBatch({
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
+  '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
   '#isAllWalkingSegments': {
     'returns true if all segments are walking segments': function() {
-      directions.segments = function() {
-        return [
-          new WalkingSegment(0, {}),
-          new WalkingSegment(0, {}),
-          new WalkingSegment(0, {}),
-          new WalkingSegment(0, {}),
-        ]
-      };
+      directions.segments = [
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+      ];
 
       assert.isTrue(directions.isAllWalkingSegments());
     },
     'returns false if at least one segment is not a walking segment': function() {
-      directions.segments = function() {
-        return [
-          new WalkingSegment(0, {}),
-          new WalkingSegment(0, {}),
-          new SubwayingSegment(0, {}),
-          new WalkingSegment(0, {}),
-        ]
-      };
+      directions.segments = [
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new SubwayingSegment(0, {}),
+        new WalkingSegment(0, {}),
+      ];
 
       assert.isFalse(directions.isAllWalkingSegments());
     }

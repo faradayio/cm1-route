@@ -12,17 +12,16 @@ sinon.stub(goodDirections, 'isLongEnough').returns(true);
 sinon.stub(goodDirections.geocoder, 'geocode').
   yields(directionsBehavior.geocodedOrigin,
          directionsBehavior.geocodedDestination);
-sinon.stub(goodDirections, 'distanceEstimate').returns(50);
 var badDirections = new FlyingDirections('A','B');
 sinon.stub(badDirections, 'isLongEnough').returns(false);
 sinon.stub(badDirections.geocoder, 'geocode').
   yields(directionsBehavior.geocodedOrigin,
          directionsBehavior.geocodedDestination);
-sinon.stub(badDirections, 'distanceEstimate').returns(50);
 
 vows.describe('FlyingDirections').addBatch({
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
+  '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
   '.events': {
     '.onGeocodeFinish': {
