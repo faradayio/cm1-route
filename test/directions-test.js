@@ -6,6 +6,7 @@ var Directions = require('../lib/directions'),
     FootprintedRoute = require('../lib/footprinted-route');
 
 var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+directions.calculateDistance = sinon.stub();
 directions.storeRoute(GoogleResult.driving);
 
 var fakeweb = require('fakeweb'),
@@ -20,6 +21,7 @@ vows.describe('Directions').addBatch({
   '#getEmissions': {
     topic: function() {
       var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+      directions.calculateDistance = sinon.stub();
       directions.storeRoute(GoogleResult.driving);
       directions.eachSegment(function(segment) {
         sinon.spy(segment, 'getEmissionEstimate');
@@ -46,6 +48,7 @@ vows.describe('Directions').addBatch({
     'on success': {
       topic: function() {
         var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+        directions.calculateDistance = sinon.stub();
         directions.storeRoute(GoogleResult.driving);
         directions.route = function(callback) {
           callback(null, directions);
@@ -72,6 +75,7 @@ vows.describe('Directions').addBatch({
     'on failure': {
       topic: function() {
         var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+        directions.calculateDistance = sinon.stub();
         directions.route = function(callback) { callback(new Error('arg')); };
         directions.routeWithEmissions(this.callback);
       },

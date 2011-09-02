@@ -41,7 +41,7 @@ global.google = {
     Geocoder: function() {
       return {
         geocode: function(options, callback) {
-          callback({});
+          callback([{ geometry: { location: {} } }]);
         }
       };
     },

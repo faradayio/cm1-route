@@ -2,13 +2,14 @@ require('./helper');
 
 var Cm1Route = require('../lib/cm1-route');
 
-var providesRoutingCallback = function(mode, extraVows) {
+var providesRoutingCallback = function(mode, args, extraVows) {
   extraVows = extraVows || {};
 
   extraVows['callback'] = {
     'on success': {
       topic: function() {
-        Cm1Route[mode]('Lansing, MI', 'Chicago, IL', this.callback, sinon.stub())
+        args.push(this.callback);
+        Cm1Route[mode].apply(Cm1Route, args)
       },
 
       'returns null for err': function(err) {
@@ -41,15 +42,13 @@ var providesRoutingCallback = function(mode, extraVows) {
 };
 
 vows.describe('Cm1Route').addBatch({
-  '#driving': providesRoutingCallback('driving'),
-  '#flight': providesRoutingCallback('flight'),
-  '#transit': providesRoutingCallback('transit', {
+  '#drive': providesRoutingCallback('drive', ['Lansing, MI', 'Chicago, IL']),
+  '#flight': providesRoutingCallback('flight', ['Lansing, MI', 'Chicago, IL']),
+  '#transit': providesRoutingCallback('transit', ['Lansing, MI', 'Chicago, IL', 'Mon 12am'], {
     'defaults to straight line distance if no route is found': function() {
       Cm1Route.transit('Lansing, MI', 'Chicago, IL', function(err, data) {
         assert.equal(data.directions.length, 1);
       });
     }
-  }),
-  '#walking': providesRoutingCallback('walking'),
-  '#bicycling': providesRoutingCallback('bicycling')
+  })
 }).export(module);
