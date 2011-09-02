@@ -7,9 +7,10 @@
   "main": "lib/native-route.js",
   "engine": "*",
   "dependencies": {
+    "async": "*",
     "CM1": "*",
-    "googlemaps": "*",
-    "querystring": "*"
+    "querystring": "*",
+    "Reston": "*"
   },
   "devDependencies": {
     "browserify": "*",

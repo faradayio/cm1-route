@@ -38,8 +38,18 @@ var LatLngBounds = function(sw, ne) {
 
 global.google = {
   maps: {
+    Geocoder: function() {
+      return {
+        geocode: function(options, callback) {
+          callback({});
+        }
+      };
+    },
     LatLng: LatLng,
     LatLngBounds: LatLngBounds,
-    MapTypeId: { ROADMAP: 'ROADMAP' }
+    MapTypeId: { ROADMAP: 'ROADMAP' },
+    DirectionsStatus: {
+      OK: 'OK'
+    }
   }
 };

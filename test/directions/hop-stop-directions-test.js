@@ -1,17 +1,26 @@
 require('../helper');
 var GoogleResult = require('../fixtures/google-result'),
     HopStopResult = require('../fixtures/hop-stop-result');
+var directionsBehavior = require('../directions-behavior');
 
 var GoogleDirectionsRoute = require('../../lib/directions/google-directions-route'),
+    HootrootApi = require('../../lib/hootroot-api'),
     HopStopDirections = require('../../lib/directions/hop-stop-directions')
     SubwayingSegment = require('../../lib/segment/subwaying-segment'),
     WalkingSegment = require('../../lib/segment/walking-segment');
 
 var directions = new HopStopDirections('A','B','WALKING','now');
-directions.x1 = 1;
-directions.y1 = 2;
-directions.x2 = 3;
-directions.y2 = 4;
+
+var goodDirections = new HopStopDirections('A','B');
+sinon.stub(goodDirections, 'isAllWalkingSegments').returns(false);
+sinon.stub(goodDirections.geocoder, 'geocode').
+  yields(directionsBehavior.geocodedOrigin,
+         directionsBehavior.geocodedDestination);
+var badDirections = new HopStopDirections('A','B');
+sinon.stub(badDirections, 'isAllWalkingSegments').returns(true);
+sinon.stub(badDirections.geocoder, 'geocode').
+  yields(directionsBehavior.geocodedOrigin,
+         directionsBehavior.geocodedDestination);
 
 var fakeweb = require('fakeweb'),
     http = require('http');
@@ -34,20 +43,7 @@ vows.describe('HopStopDirections').addBatch({
     }
   },
 
-  '#isFullyGeocoded': {
-    'returns true if origin and destination are both geocoded': function() {
-      assert.isTrue(directions.isFullyGeocoded());
-    },
-    'returns false if origin and destination are not geocoded': function() {
-      var directions = new HopStopDirections('A','B','WALKING','now');
-      directions.x1 = 12;
-      directions.y1 = 13;
-      directions.x2 = null;
-      directions.y2 = null;
-
-      assert.isFalse(directions.isFullyGeocoded());
-    }
-  },
+  '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
 
   '#isAllWalkingSegments': {
     'returns true if all segments are walking segments': function() {
@@ -76,105 +72,27 @@ vows.describe('HopStopDirections').addBatch({
     }
   },
 
+  '#distanceEstimate': {
+    'returns a total distance': function() {
+      // TODO
+    }
+  },
+
   '.events': sinon.testCase({
-    '.onGeocodeOriginSuccess': {
-      'sets x1 and y1': function() {
-        var event = HopStopDirections.events.
-          onGeocodeOriginSuccess(directions, sinon.stub(), sinon.stub());
-        event(GoogleResult.geocoderResult);
-        assert.equal(directions.x1, 1);
-        assert.equal(directions.y1, 2);
-      },
-      'calls #onGeocodeSuccess': function() {
-        var onSuccess = sinon.spy();
-        var onError = sinon.spy();
-        var onGeocodeSuccess = sinon.spy(HopStopDirections.events, 'onGeocodeSuccess');
+    '.fetchHopStop': {
+      'sends a request to HopStop API': function() {
+        var hopstop = sinon.spy(HootrootApi, 'hopstop');
 
-        var event = HopStopDirections.events.
-          onGeocodeOriginSuccess(directions, onSuccess, onError);
-        event(GoogleResult.geocoderResult);
-        sinon.assert.calledWithExactly(HopStopDirections.events.onGeocodeSuccess, directions, onSuccess, onError);
+        var evt = HopStopDirections.events.fetchHopStop(goodDirections);
+        evt(sinon.stub());
 
-        HopStopDirections.events.onGeocodeSuccess.restore();
-      }
-    },
+        assert.deepEqual(hopstop.getCall(0).args[0], {
+          x1: 1, y1: 1, x2: 1, y2: 1,
+          mode: 'PUBLICTRANSIT', when: 'now'
+        });
 
-    '.onGeocodeDestinationSuccess': {
-      'sets x2 and y2': function() {
-        var event = HopStopDirections.events.
-          onGeocodeDestinationSuccess(directions, sinon.stub(), sinon.stub());
-        event(GoogleResult.geocoderResult);
-        assert.equal(directions.x2, 3);
-        assert.equal(directions.y2, 4);
-      },
-      'calls #onGeocodeSuccess': function() {
-        var onSuccess = sinon.spy();
-        var onError = sinon.spy();
-        var onGeocodeSuccess = sinon.spy(HopStopDirections.events, 'onGeocodeSuccess');
-
-        var event = HopStopDirections.events.
-          onGeocodeDestinationSuccess(directions, onSuccess, onError);
-        event(GoogleResult.geocoderResult);
-        sinon.assert.calledWithExactly(onGeocodeSuccess, directions, onSuccess, onError);
-
-        HopStopDirections.events.onGeocodeSuccess.restore();
-      },
-    },
-
-    '.onGeocodeSuccess': {
-      'calculates the route when fully geocoded': function() {
-        sinon.stub(directions, 'isFullyGeocoded', function() { return true });
-        var onSuccess = sinon.spy();
-        var onError = sinon.spy();
-
-        HopStopDirections.events.onGeocodeSuccess(directions, onSuccess, onError);
-        sinon.assert.called(onSuccess);
-
-        directions.isFullyGeocoded.restore();
-      },
-      'does not send a hopstop request if not fully geocoded': function() {
-        sinon.stub(directions, 'isFullyGeocoded', function() { return false });
-        var onSuccess = sinon.spy('onSuccess');
-
-        HopStopDirections.events.onGeocodeSuccess(directions, onSuccess);
-        assert.isFalse(onSuccess.called);
-
-        directions.isFullyGeocoded.restore();
-      }
-      //'runs the onError method on failure': function() {
-        //var onError = sinon.spy('onError');
-        //sinon.stub(directions, 'isFullyGeocoded', function() { return true });
-        //http.register_intercept({
-          //uri: '/hopstops?x1=1&y1=2&x2=3&y2=4&mode=SUBWAYING&when=now', 
-          //host: 'hootroot.com'
-        //});
-
-
-        //HopStopDirections.events.onGeocodeSuccess(directions, sinon.stub(), onError);
-        //sinon.assert.called(onError);
-
-        //directions.isFullyGeocoded.restore();
-      //}
-    },
-
-    '.onHopStopSuccess': {
-      'sets directionResult on success': function() {
-        var event = HopStopDirections.events.onHopStopSuccess(directions, sinon.stub(), sinon.stub());
-        event(HopStopResult.subway);
-        assert.equal(directions.directionsResult.routes.length, 1);
-      },
-      'runs the onError method if all segments are walking segments': function() {
-        var onError = sinon.spy('onError');
-        sinon.stub(directions, 'isFullyGeocoded', function() { return true });
-        sinon.stub(directions, 'isAllWalkingSegments', function() { return true });
-
-        var event = HopStopDirections.events.onHopStopSuccess(directions, sinon.stub(), onError);
-        event(HopStopResult.walking);
-        sinon.assert.called(onError);
-
-        directions.isFullyGeocoded.restore();
-        directions.isAllWalkingSegments.restore();
+        HootrootApi.hopstop.restore();
       }
     }
   })
-}).export(module);
+}).export(module, { error: false });
