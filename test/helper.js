@@ -50,6 +50,9 @@ global.google = {
     MapTypeId: { ROADMAP: 'ROADMAP' },
     DirectionsStatus: {
       OK: 'OK'
+    },
+    DirectionsService: function() {
+      this.route = function(result, callback) { callback({}); };
     }
   }
 };

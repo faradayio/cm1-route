@@ -32,18 +32,8 @@ http.register_intercept({
 });
 
 vows.describe('HopStopDirections').addBatch({
-  '#steps': {
-    'returns an array of steps': function() {
-      directions.directionsResult = { routes: [new GoogleDirectionsRoute(HopStopResult.subway)] };
-      var steps = directions.steps();
-
-      assert.equal(steps[0].duration.value, 54);
-      assert.equal(steps[1].duration.value, 688);
-      assert.equal(steps[2].duration.value, 298);
-    }
-  },
-
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
+  '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
 
   '#isAllWalkingSegments': {
     'returns true if all segments are walking segments': function() {

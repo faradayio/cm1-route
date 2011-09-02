@@ -1,10 +1,12 @@
 require('./helper');
 var Cm1Result = require('./fixtures/cm1-result'),
     GoogleResult = require('./fixtures/google-result');
-var Directions = require('../lib/directions');
+
+var Directions = require('../lib/directions'),
+    FootprintedRoute = require('../lib/footprinted-route');
 
 var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
-directions.directionsResult = GoogleResult.driving;
+directions.storeRoute(GoogleResult.driving);
 
 var fakeweb = require('fakeweb'),
     http = require('http');
@@ -15,66 +17,78 @@ http.register_intercept({
 });
 
 vows.describe('Directions').addBatch({
-  '#segments': {
-    'returns an array of segments': function() {
-      var segments = directions.segments()
+  '#getEmissions': {
+    topic: function() {
+      var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+      directions.storeRoute(GoogleResult.driving);
+      directions.eachSegment(function(segment) {
+        sinon.spy(segment, 'getEmissionEstimate');
+      });
+      directions.segmentEmissionsCallback = sinon.spy();
 
-      assert.isNumber(segments[0].distance);
-      assert.equal(segments[0].index, 0);
-
-      assert.isNumber(segments[1].distance);
-      assert.equal(segments[1].index, 1);
-
-      assert.isNumber(segments[2].distance);
-      assert.equal(segments[2].index, 2);
-
-      assert.isNumber(segments[3].distance);
-      assert.equal(segments[3].index, 3);
+      directions.getEmissions(this.callback, directions.segmentEmissionsCallback);
+    },
+    
+    'gets emissions for all segments': function(err, directions) {
+      directions.eachSegment(function(segment) {
+        sinon.assert.called(segment.getEmissionEstimate);
+      });
+    },
+    'calls back with directions when all segments have calculated emissions': function(err, directions) {
+      assert.instanceOf(directions, Directions);
+    },
+    'calls back for each segment': function(err, directions) {
+      assert.equal(directions.segmentEmissionsCallback.callCount, directions.segments.length);
     }
   },
 
-  '#getEmissions': {
-    'gets emissions for all segments': function() {
-      var spies = [];
-      directions.eachSegment(function(segment) {
-        spies.push(sinon.spy(segment, 'getEmissionEstimateWithSegment'));
-      });
-      directions.getEmissions(function() {}, function() {});
-      spies.forEach(function(spy) {
-        sinon.assert.called(spy);
-      });
+  '#routeWithEmissions': {
+    'on success': {
+      topic: function() {
+        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+        directions.storeRoute(GoogleResult.driving);
+        directions.route = function(callback) {
+          callback(null, directions);
+        };
+        directions.eachSegment(function(segment) {
+          sinon.spy(segment, 'getEmissionEstimate', function(callback) {
+            segment.emissionEstimate = {};
+            callback(null, segment);
+          });
+        });
+
+        directions.routeWithEmissions(this.callback);
+      },
+      
+      'calls back with directions having routing information': function(err, directions) {
+        assert.isNotEmpty(directions.segments);
+      },
+      'calls back with directions having emissions information': function(err, directions) {
+        directions.eachSegment(function(segment) {
+          assert.isObject(segment.emissionEstimate);
+        });
+      }
     },
-    'fires the onFinish event when all segments have calculated emissions': function() {
-      var onFinish = sinon.spy();
+    'on failure': {
+      topic: function() {
+        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
+        directions.route = function(callback) { callback(new Error('arg')); };
+        directions.routeWithEmissions(this.callback);
+      },
 
-      directions.getEmissions(function() {}, function() {}, onFinish);
-
-      sinon.assert.called(onFinish);
+      'calls back with an error if routing/emissions fail': function(err) {
+        assert.instanceOf(err, Error);
+      }
     }
   },
 
   '.events': {
-    '.onSegmentEmissionsSuccess': {
+    '.onSegmentGetEmissionEstimate': {
       'updates the total emissions': function() {
-        var evt = Directions.events.onSegmentEmissionsSuccess(directions, function() {}, function() {});
+        var evt = Directions.events.onSegmentGetEmissionEstimate(directions, sinon.stub(), sinon.stub());
         directions.totalEmissions = 0;
-        evt({}, { value: function() { return 14254.4678; } });
+        evt(null, { value: function() { return 14254.4678; } });
         assert.approximately(directions.totalEmissions, 14254.46, 0.01);
-      },
-      'fires the onFinish event when all segments have calculated emissions': function() {
-        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
-        directions.segmentEmissionsSuccessCount = 0;
-        directions.segments = function() { return [{}, {}, {}, {}]; };
-
-        var onFinish = sinon.spy();
-
-        var onner = Directions.events.onSegmentEmissionsSuccess(directions, function() {}, onFinish);
-        onner(0, { value: function() { return 1; } });
-        onner(1, { value: function() { return 1; } });
-        onner(2, { value: function() { return 1; } });
-        onner(3, { value: function() { return 1; } });
-
-        sinon.assert.calledWithExactly(onFinish, directions);
       }
     }
   },
@@ -84,8 +98,8 @@ vows.describe('Directions').addBatch({
       assert.equal(directions.totalTime(), '6 mins');
     },
     'returns empty string if there are no segments': function() {
-      directions._segments = [];
+      directions.segments = [];
       assert.equal(directions.totalTime(), '');
     }
   }
-}).export(module);
+}).export(module, { error: false });

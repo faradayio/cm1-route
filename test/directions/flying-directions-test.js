@@ -21,20 +21,8 @@ sinon.stub(badDirections.geocoder, 'geocode').
 sinon.stub(badDirections, 'distanceEstimate').returns(50);
 
 vows.describe('FlyingDirections').addBatch({
-  '#steps': {
-    'returns an array of a single step': function() {
-      directions.isFullyGeocoded = function() { return true; };
-      directions.distanceEstimate = function() { return 90000000; };
-      directions.originLatLng = { lat: function() { return 1; }, lng: function() { return 2; } };
-      directions.destinationLatLng = { lat: function() { return 3; }, lng: function() { return 4; } };
-      directions.onGeocodeFinish
-      var steps = directions.steps();
-
-      assert.equal(steps[0].duration.value, 511362);
-    }
-  },
-
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
+  '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
 
   '.events': {
     '.onGeocodeFinish': {

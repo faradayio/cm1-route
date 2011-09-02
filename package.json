@@ -8,9 +8,8 @@
   "engine": "*",
   "dependencies": {
     "async": "*",
-    "CM1": "*",
+    "CM1": ">= 0.2.0",
     "querystring": "*",
-    "Reston": "*"
   },
   "devDependencies": {
     "browserify": "*",

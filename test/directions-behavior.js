@@ -1,4 +1,5 @@
-var Directions = require('../lib/directions');
+var Directions = require('../lib/directions'),
+    Segment = require('../lib/segment');
 
 module.exports = {
   providesRoute: function(goodDirections, badDirections) {
@@ -27,6 +28,23 @@ module.exports = {
           assert.instanceOf(err, Error);
           assert.match(err.message, /route/i);
         }
+      }
+    };
+  },
+
+  proviesStoreRoute: function(directions) {
+    return {
+      'sets #directionsResult': function() {
+        assert.isObject(directions.directionsResult);
+      },
+      'sets #steps': function() {
+        assert.isNotEmpty(directions.steps);
+      },
+      'sets #segments': function() {
+        assert.isNotEmpty(directions.segments);
+        directions.segments.forEach(function(segment) {
+          assert.instanceOf(segment, Segment);
+        });
       }
     };
   },
