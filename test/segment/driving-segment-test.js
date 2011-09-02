@@ -22,17 +22,10 @@ vows.describe('DrivingSegment').addBatch({
     assert.equal(driving.duration, 3401);
   },
 
-  '#getEmissionEstimateWithSegment': {
-    'passes a segment parameter': function() {
-      var segment;
-      driving.getEmissionEstimateWithSegment(function(f_segment, emissionEstimate) {
-        segment = f_segment;
-      });
-      assert.equal(segment.index, 0);
-    },
+  '#getEmissionEstimate': {
     'passes an emissions parameter': function() {
       var emissions;
-      driving.getEmissionEstimateWithSegment(function(f_segment, emissionEstimate) {
+      driving.getEmissionEstimate(function(err, emissionEstimate) {
         emissions = emissionEstimate.value();
       });
       assert.equal(emissions, 6.8);

@@ -10,19 +10,17 @@ vows.describe('WalkingSegment').addBatch({
     var ws = new WalkingSegment(0, { duration: { value: 120 } });
     assert.equal(ws.duration, 120)
   },
-  '#getEmissionEstimateWithSegment': {
+  '#getEmissionEstimate': {
     'results in zero emissions': function() {
       var walk = new WalkingSegment(0, {
         distance: { value: 28.5 },
         instructions: 'Go here' });
       
       var emissions, step;
-      walk.getEmissionEstimateWithSegment(function(f_step, emissionEstimate) {
-        step = f_step;
+      walk.getEmissionEstimate(function(err, emissionEstimate) {
         emissions = emissionEstimate.value();
       });
 
-      assert.equal(step.index, 0);
       assert.equal(emissions, 0);
     }
   }

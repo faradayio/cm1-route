@@ -11,19 +11,12 @@ vows.describe('BicyclingSegment').addBatch({
     assert.equal(bicycling.duration, 4800);
   },
 
-  '#getEmissionEstimateWithSegment': {
+  '#getEmissionEstimate': {
     topic: bicycling,
 
-    'passes a segment parameter': function() {
-      var segment;
-      bicycling.getEmissionEstimateWithSegment(function(f_segment, emissionEstimate) {
-        segment = f_segment;
-      });
-      assert.equal(segment.index, 0);
-    },
     'passes an emissions parameter': function() {
       var emissions;
-      bicycling.getEmissionEstimateWithSegment(function(f_segment, emissionEstimate) {
+      bicycling.getEmissionEstimate(function(err, emissionEstimate) {
         emissions = emissionEstimate.value();
       });
       assert.equal(emissions, 0);
