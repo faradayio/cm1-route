@@ -4,7 +4,7 @@
   "author": "Derek Kastner <dkastner@gmail.com>",
   "description": "Routing API based on HootRoot",
   "homepage": "http://github.com/brighterplanet/cm1-route",
-  "main": "lib/native-route.js",
+  "main": "lib/cm1-route.js",
   "engine": "*",
   "dependencies": {
     "async": "*",
