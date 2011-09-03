@@ -13,4 +13,4 @@ task 'build', 'Build client-side cm1-route.js using browserify', ->
 
 task 'package', 'Package javascript into a deployable file', ->
   console.log 'Tar/gzing...'
-  child.exec 'cp -R lib build/package; cp package.json build/package; cd build; tar -czf ../native-route.tar.gz package'
+  child.exec 'cp -R lib build/package; cp package.json build/package; cd build; tar -czf ../cm1-route.tar.gz package'
