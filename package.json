@@ -1,9 +1,9 @@
 {
-  "name": "native_route",
+  "name": "cm1-route",
   "version": "0.1.0",
   "author": "Derek Kastner <dkastner@gmail.com>",
   "description": "Routing API based on HootRoot",
-  "homepage": "http://github.com/brighterplanet/native_route",
+  "homepage": "http://github.com/brighterplanet/cm1-route",
   "main": "lib/native-route.js",
   "engine": "*",
   "dependencies": {
@@ -20,6 +20,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/brighterplanet/native_route.git"
+    "url": "https://github.com/brighterplanet/cm1-route.git"
   }
 }
