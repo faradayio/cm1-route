@@ -812,6 +812,47 @@ Response.prototype.write = function (res) {
     return module.exports;
 };
 
+require.modules["/directions-factory.js"] = function () {
+    var module = { exports : {} };
+    var exports = module.exports;
+    var __dirname = "/";
+    var __filename = "/directions-factory.js";
+    
+    var require = function (file) {
+        return __require(file, "/");
+    };
+    
+    require.resolve = function (file) {
+        return __require.resolve(name, "/");
+    };
+    
+    require.modules = __require.modules;
+    __require.modules["/directions-factory.js"]._cached = module.exports;
+    
+    (function () {
+        var FlyingDirections = require('./directions/flying-directions'),
+    GoogleDirections = require('./directions/google-directions'),
+    HopStopDirections = require('./directions/hop-stop-directions');
+
+var DirectionsFactory = module.exports = {
+  create: function(origin, destination, mode, day, time) {
+    if(mode == 'PUBLICTRANSIT' || mode == 'SUBWAYING' || mode == 'BUSSING') {
+      return new HopStopDirections(origin, destination, mode, day, time);
+    } else if(mode == 'FLYING') {
+      return new FlyingDirections(origin, destination, mode);
+    } else {
+      return new GoogleDirections(origin, destination, mode);
+    }
+  }
+};
+
+;
+    }).call(module.exports);
+    
+    __require.modules["/directions-factory.js"]._cached = module.exports;
+    return module.exports;
+};
+
 require.modules["/directions/flying-directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
@@ -3026,13 +3067,15 @@ process.nextTick(function () {
     };
     require.modules = __require.modules;
     
-    var FlyingDirections = require('./directions/flying-directions'),
+    var DirectionsFactory = require('./directions-factory'),
+    FlyingDirections = require('./directions/flying-directions'),
     FootprintedRoute = require('./footprinted-route'),
     GoogleDirections = require('./directions/google-directions'),
     HopStopDirections = require('./directions/hop-stop-directions');
 
 var Cm1Route = module.exports = {
   NumberFormatter: require('./number-formatter'),
+  DirectionsFactory: DirectionsFactory,
   FlyingDirections: FlyingDirections,
   GoogleDirections: GoogleDirections,
   HopStopDirections: HopStopDirections,
