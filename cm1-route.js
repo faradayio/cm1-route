@@ -1794,7 +1794,7 @@ require.modules["/directions-events.js"] = function () {
   this.onSegmentGetEmissionEstimate = function(directions, segmentCallback, asyncCallback) {
     return function(err, emissionEstimate) {
       directions.totalEmissions += emissionEstimate.value();
-      if(segmentCallback) segmentCallback(err, directions);
+      if(segmentCallback) segmentCallback(err, emissionEstimate);
       asyncCallback(err);
     };
   };
@@ -3022,16 +3022,20 @@ var HootrootApi = module.exports = {
       method: 'GET',
       headers: { ContentType: 'application/json' }
     }, function (response) {
-      var data = '';
-      response.on('data', function (buf) {
-        data += buf;
-      });
-      response.on('error', function() { callback('HTTP request for Hopstop failed: ' + data) });
+      if(response.statusCode >= 300) {
+        callback(new Error('HTTP request for Hopstop failed: ' + response.statusCode));
+      } else {
+        var data = '';
+        response.on('data', function (buf) {
+          data += buf;
+        });
+        response.on('error', function() { callback('HTTP request for Hopstop failed: ' + data) });
 
-      response.on('end', function () {
-        var json = JSON.parse(data);
-        callback(null, json);
-      });
+        response.on('end', function () {
+          var json = JSON.parse(data);
+          callback(null, json);
+        });
+      }
     });
     request.end();
 
@@ -3102,7 +3106,11 @@ var Cm1Route = module.exports = {
 var events = {
   translateRouteCallback: function(callback) {
     return function(err, directions) {
-      callback(err, new FootprintedRoute(directions));
+      if(err) {
+        callback(err);
+      } else {
+        callback(err, new FootprintedRoute(directions));
+      }
     };
   }
 };
