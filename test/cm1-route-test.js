@@ -1,6 +1,10 @@
 require('./helper');
+var HopStopResult = require('./fixtures/hop-stop-result');
 
 var Cm1Route = require('../lib/cm1-route');
+
+var fakeweb = require('fakeweb'),
+    http = require('http');
 
 var providesRoutingCallback = function(mode, args, extraVows) {
   extraVows = extraVows || {};
@@ -29,7 +33,15 @@ var providesRoutingCallback = function(mode, args, extraVows) {
     },
     'on error': {
       topic: function() {
-        Cm1Route[mode]('Lansing, MI', 'Chicago, IL', sinon.stub(), this.callback)
+        sinon.stub(google.maps, 'DirectionsService', function() {
+          this.route = function(result, callback) {
+            callback({}, 'BADNEWSBEARS');
+          };
+        });
+
+        args.push(this.callback);
+        Cm1Route[mode].apply(Cm1Route, args);
+        google.maps.DirectionsService.restore();
       },
 
       'callback responds with error if routing fails': function(err) {
@@ -46,9 +58,15 @@ vows.describe('Cm1Route').addBatch({
   '#flight': providesRoutingCallback('flight', ['Lansing, MI', 'Chicago, IL']),
   '#transit': providesRoutingCallback('transit', ['Lansing, MI', 'Chicago, IL', 'Mon 12am'], {
     'defaults to straight line distance if no route is found': function() {
-      Cm1Route.transit('Lansing, MI', 'Chicago, IL', function(err, data) {
+      http.register_intercept({
+        uri: '/hopstops?x1=1&x2=1&y1=1&y1=1&mode=PUBLICTRANSIT&when=Mon 12am', 
+        host: 'hootroot.com',
+        body: JSON.stringify(HopStopResult.subway)
+      });
+
+      Cm1Route.transit('Lansing, MI', 'Chicago, IL', 'Mon 12am', function(err, data) {
         assert.equal(data.directions.length, 1);
       });
     }
   })
-}).export(module);
+}).export(module, { error: false });

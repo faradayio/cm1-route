@@ -4,6 +4,8 @@ global.sinon = require('sinon');
 
 var jsdom = require('jsdom');
 
+var Cm1Result = require('./fixtures/cm1-result');
+
 global.setHtmlFixtures = function(html) {
   html = '<html><head></head><body>' + html + '</body></html>';
   window = jsdom.jsdom(html).createWindow();
@@ -41,7 +43,14 @@ global.google = {
     Geocoder: function() {
       return {
         geocode: function(options, callback) {
-          callback([{ geometry: { location: {} } }]);
+          callback([{
+            geometry: {
+              location: {
+                lng: function() { return 1; },
+                lat: function() { return 1; }
+              }
+            }
+          }]);
         }
       };
     },
@@ -52,7 +61,9 @@ global.google = {
       OK: 'OK'
     },
     DirectionsService: function() {
-      this.route = function(result, callback) { callback({}); };
+      this.route = function(result, callback) {
+        callback(Cm1Result.fit);
+      };
     },
     geometry: {
       spherical: {
