@@ -25,8 +25,7 @@ module.exports = {
         },
 
         'sends an Error object in err': function(err) {
-          assert.instanceOf(err, Error);
-          assert.match(err.message, /route/i);
+          assert.isString(err.message);
         }
       }
     };
