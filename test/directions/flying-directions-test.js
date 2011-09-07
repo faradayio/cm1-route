@@ -45,7 +45,7 @@ vows.describe('FlyingDirections').addBatch({
         },
 
         'errs back if the distance is too short': function(err) {
-          assert.instanceOf(err, Error);
+          assert.instanceOf(err, FlyingDirections.RouteTooShortError);
         }
       }
     }
