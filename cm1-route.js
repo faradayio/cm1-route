@@ -328,7 +328,7 @@ require.modules["/node_modules/http-browserify/package.json"] = function () {
     __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"http-browserify","version":"0.0.0","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"license":"MIT/X11","engine":{"node":">=0.4"}};
+        module.exports = {"name":"http-browserify","version":"0.0.2","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"license":"MIT/X11","engine":{"node":">=0.4"}};
     }).call(module.exports);
     
     __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
@@ -357,12 +357,12 @@ require.modules["/node_modules/http-browserify/browser.js"] = function () {
 var EventEmitter = require('events').EventEmitter;
 var Request = require('./lib/request');
 
+if (typeof window === 'undefined') {
+    throw new Error('no window object present');
+}
+
 http.request = function (params, cb) {
-    if (!params) params = {};
-    if (!params.host) params.host = window.location.host.split(':')[0];
-    if (!params.port) params.port = window.location.port;
-    
-    var req = new Request(new xhrHttp, params);
+    var req = Request.create(params);
     if (cb) req.on('response', cb);
     return req;
 };
@@ -373,42 +373,6 @@ http.get = function (params, cb) {
     req.end();
     return req;
 };
-
-var xhrHttp = (function () {
-    if (typeof window === 'undefined') {
-        throw new Error('no window object present');
-    }
-    else if (window.XMLHttpRequest) {
-        return window.XMLHttpRequest;
-    }
-    else if (window.ActiveXObject) {
-        var axs = [
-            'Msxml2.XMLHTTP.6.0',
-            'Msxml2.XMLHTTP.3.0',
-            'Microsoft.XMLHTTP'
-        ];
-        for (var i = 0; i < axs.length; i++) {
-            try {
-                var ax = new(window.ActiveXObject)(axs[i]);
-                return function () {
-                    if (ax) {
-                        var ax_ = ax;
-                        ax = null;
-                        return ax_;
-                    }
-                    else {
-                        return new(window.ActiveXObject)(axs[i]);
-                    }
-                };
-            }
-            catch (e) {}
-        }
-        throw new Error('ajax not supported in this browser')
-    }
-    else {
-        throw new Error('ajax not supported in this browser');
-    }
-})();
 ;
     }).call(module.exports);
     
@@ -628,38 +592,33 @@ require.modules["/node_modules/http-browserify/lib/request.js"] = function () {
         var EventEmitter = require('events').EventEmitter;
 var Response = require('./response');
 
-var Request = module.exports = function (xhr, params) {
-    var self = this;
-    self.xhr = xhr;
-    self.body = '';
-    
-    var uri = params.host + ':' + params.port + (params.path || '/');
-    
-    if (params.headers) {
-        Object.keys(params.headers).forEach(function (key) {
-            var value = params.headers[key];
-            if (Array.isArray(value)) {
-                value.forEach(function (v) {
-                    xhr.setRequestHeader(key, v);
-                });
-            }
-            else xhr.setRequestHeader(key, value)
-        });
-    }
-    
-    xhr.open(params.method || 'GET', 'http://' + uri, true);
-    
-    var res = new Response;
-    res.on('ready', function () {
-        self.emit('response', res);
-    });
-    
-    xhr.onreadystatechange = function () {
-        res.handle(xhr);
-    };
-};
+var Request = module.exports = function() {};
 
 Request.prototype = new EventEmitter;
+
+Request.create = function(params) {
+    if (!params) params = {};
+
+    var req;
+    if(params.host && window.XDomainRequest) { // M$ IE XDR - use when host is set and XDR present
+      req = new XdrRequest(params);
+    } else {                                   // Everybody else
+      req = new XhrRequest(params);
+    }
+    return req;
+}
+
+Request.prototype.init = function(params) {
+    if (!params.host) params.host = window.location.host.split(':')[0];
+    if (!params.port) params.port = window.location.port;
+    
+    this.body = '';
+    if(!/^\//.test(params.path)) params.path = '/' + params.path;
+    this.uri = params.host + ':' + params.port + (params.path || '/');
+    this.xhr = new this.xhrClass;
+
+    this.xhr.open(params.method || 'GET', 'http://' + this.uri, true);
+};
 
 Request.prototype.setHeader = function (key, value) {
     if ((Array.isArray && Array.isArray(value))
@@ -680,6 +639,122 @@ Request.prototype.write = function (s) {
 Request.prototype.end = function (s) {
     if (s !== undefined) this.write(s);
     this.xhr.send(this.body);
+};
+
+
+// XhrRequest
+
+var XhrRequest = function(params) {
+    var self = this;
+    self.init(params);
+    var xhr = this.xhr;
+    
+    if(params.headers) {
+        Object.keys(params.headers).forEach(function (key) {
+            var value = params.headers[key];
+            if (Array.isArray(value)) {
+                value.forEach(function (v) {
+                    xhr.setRequestHeader(key, v);
+                });
+            }
+            else xhr.setRequestHeader(key, value)
+        });
+    }
+  
+    xhr.onreadystatechange = function () {
+        res.handle(xhr);
+    };
+    
+    var res = new Response;
+    res.on('ready', function () {
+        self.emit('response', res);
+    });
+};
+
+XhrRequest.prototype = new Request;
+
+XhrRequest.prototype.xhrClass = function() {
+    if (window.XMLHttpRequest) {
+        return window.XMLHttpRequest;
+    }
+    else if (window.ActiveXObject) {
+        var axs = [
+            'Msxml2.XMLHTTP.6.0',
+            'Msxml2.XMLHTTP.3.0',
+            'Microsoft.XMLHTTP'
+        ];
+        for (var i = 0; i < axs.length; i++) {
+            try {
+                var ax = new(window.ActiveXObject)(axs[i]);
+                return function () {
+                    if (ax) {
+                        var ax_ = ax;
+                        ax = null;
+                        return ax_;
+                    }
+                    else {
+                        return new(window.ActiveXObject)(axs[i]);
+                    }
+                };
+            }
+            catch (e) {}
+        }
+        throw new Error('ajax not supported in this browser')
+    }
+    else {
+        throw new Error('ajax not supported in this browser');
+    }
+}();
+
+
+
+// XdrRequest
+
+var XdrRequest = function(params) {
+    var self = this;
+    self.init(params);
+    var xhr = this.xhr;
+
+    self.headers = {};
+
+    var res = new XdrResponse();
+
+    xhr.onprogress = function() {
+        xhr.readyState = 2;
+        res.contentType = xhr.contentType; // There, that's all the headers you get
+        res.handle(xhr);
+    }
+    xhr.onerror = function() {
+        xhr.readyState = 3;
+        xhr.error = "Who the fuck knows? IE doesn't care!";
+        res.handle(xhr);
+    };
+    xhr.onload = function() {
+        xdr.readyState = 4;
+        res.handle(xhr);
+    };
+
+    res.on('ready', function () {
+        self.emit('response', res);
+    });
+};
+
+XdrRequest.prototype = new Request;
+
+XdrRequest.prototype.xhrClass = window.XDomainRequest;
+
+
+
+// XdrResponse
+
+var XdrResponse = function() {
+    this.offset = 0;
+};
+
+XdrResponse.prototype = new Response();
+
+XdrResponse.prototype.getAllResponseHeaders = function() {
+  return 'Content-Type: ' + this.contentType;
 };
 ;
     }).call(module.exports);
@@ -812,22 +887,123 @@ Response.prototype.write = function (res) {
     return module.exports;
 };
 
-require.modules["/directions-factory.js"] = function () {
+require.modules["/lib/cm1-route.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/directions-factory.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/cm1-route.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions-factory.js"]._cached = module.exports;
+    __require.modules["/lib/cm1-route.js"]._cached = module.exports;
+    
+    (function () {
+        if(!process.env) process.env = {};
+
+var DirectionsFactory = require('./directions-factory'),
+    DirectRailDirections = require('./directions/direct-rail-directions'),
+    FlyingDirections = require('./directions/flying-directions'),
+    FootprintedRoute = require('./footprinted-route'),
+    GoogleDirections = require('./directions/google-directions'),
+    HopStopDirections = require('./directions/hop-stop-directions');
+
+var Cm1Route = module.exports = {
+  NumberFormatter: require('./number-formatter'),
+  DirectionsFactory: DirectionsFactory,
+  FlyingDirections: FlyingDirections,
+  GoogleDirections: GoogleDirections,
+  HopStopDirections: HopStopDirections,
+  DirectRailDirections: DirectRailDirections,
+
+  // Get driving directions and associated emissions
+  drive: function(origin, destination, callback) {
+    var directions = new GoogleDirections(origin, destination, 'DRIVING');
+    directions.routeWithEmissions(events.translateRouteCallback(callback));
+  },
+
+  // Get flying directions and associated emissions
+  flight: function(origin, destination, callback) {
+    var directions = new FlyingDirections(origin, destination);
+    directions.routeWithEmissions(events.translateRouteCallback(callback));
+  },
+
+  // Get transit (bus, rail) directions and associated emissions
+  transit: function(origin, destination, when, callback) {
+    var directions = new HopStopDirections(origin, destination, 'PUBLICTRANSIT', when);
+    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
+  },
+
+  rail: function(origin, destination, when, callback) {
+    var directions = new HopStopDirections(origin, destination, 'SUBWAYING', when);
+    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
+  },
+
+  bus: function(origin, destination, when, callback) {
+    var directions = new HopStopDirections(origin, destination, 'BUSSING', when);
+    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
+  },
+
+  shouldDefaultTransitToDirectRoute: function(err) {
+    err = err ? err : false;
+    var walkingError = (err && err.name == 'AllWalkingSegmentsError');
+    return (walkingError && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
+  }
+};
+
+var events = {
+  translateRouteCallback: function(callback) {
+    return function(err, directions) {
+      if(err) {
+        callback(err);
+      } else {
+        callback(err, new FootprintedRoute(directions));
+      }
+    };
+  },
+
+  transitRailFallbackCallback: function(callback) {
+    return function(err, hopStopDirections) {
+      if(Cm1Route.shouldDefaultTransitToDirectRoute(err)) {
+        console.log('falling back to direct rail');
+        var directDirections = new DirectRailDirections(
+            hopStopDirections.origin, hopStopDirections.destination);
+        directDirections.routeWithEmissions(events.translateRouteCallback(callback));
+      } else {
+        callback(err, new FootprintedRoute(hopStopDirections));
+      }
+    };
+  }
+};
+;
+    }).call(module.exports);
+    
+    __require.modules["/lib/cm1-route.js"]._cached = module.exports;
+    return module.exports;
+};
+
+require.modules["/lib/directions-factory.js"] = function () {
+    var module = { exports : {} };
+    var exports = module.exports;
+    var __dirname = "/lib";
+    var __filename = "/lib/directions-factory.js";
+    
+    var require = function (file) {
+        return __require(file, "/lib");
+    };
+    
+    require.resolve = function (file) {
+        return __require.resolve(name, "/lib");
+    };
+    
+    require.modules = __require.modules;
+    __require.modules["/lib/directions-factory.js"]._cached = module.exports;
     
     (function () {
         var FlyingDirections = require('./directions/flying-directions'),
@@ -849,32 +1025,33 @@ var DirectionsFactory = module.exports = {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions-factory.js"]._cached = module.exports;
+    __require.modules["/lib/directions-factory.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions/flying-directions.js"] = function () {
+require.modules["/lib/directions/flying-directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/directions";
-    var __filename = "/directions/flying-directions.js";
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/flying-directions.js";
     
     var require = function (file) {
-        return __require(file, "/directions");
+        return __require(file, "/lib/directions");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/directions");
+        return __require.resolve(name, "/lib/directions");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions/flying-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/flying-directions.js"]._cached = module.exports;
     
     (function () {
         var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
     GoogleDirectionsRoute = require('./google-directions-route'),
-    NumberFormatter = require('../number-formatter');
+    NumberFormatter = require('../number-formatter'),
+    TimeFormatter = require('../time-formatter');
 
 var async = require('async');
 
@@ -963,32 +1140,32 @@ FlyingDirections.events.onGeocodeFinish = function(directions, callback) {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions/flying-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/flying-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions.js"] = function () {
+require.modules["/lib/directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/directions.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/directions.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions.js"]._cached = module.exports;
     
     (function () {
         var async = require('async');
 
 var DirectionsEvents = require('./directions-events'),
-    FootprintedRoute = require('../lib/footprinted-route'),
+    FootprintedRoute = require('./footprinted-route'),
     SegmentFactory = require('./segment-factory'),
     TimeFormatter = require('./time-formatter');
 
@@ -1055,7 +1232,7 @@ Directions.prototype.routeWithEmissions = function(callback) {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -1769,22 +1946,22 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     return module.exports;
 };
 
-require.modules["/directions-events.js"] = function () {
+require.modules["/lib/directions-events.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/directions-events.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/directions-events.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions-events.js"]._cached = module.exports;
+    __require.modules["/lib/directions-events.js"]._cached = module.exports;
     
     (function () {
         var DirectionsEvents = module.exports = function() {
@@ -1792,6 +1969,12 @@ require.modules["/directions-events.js"] = function () {
   this.geocode = function(directions, addressProperty, property) {
     return function(callback) {
       var address = directions[addressProperty];
+
+      if(address.lat) {
+        directions[property] = address;
+        return callback(null, [{geometry: { location: address }}]);
+      }
+
       directions.geocoder.geocode({ address: address }, function(results) {
         if(results.length > 0) {
           directions[property] = results[0].geometry.location;
@@ -1821,26 +2004,26 @@ DirectionsEvents.GeocodeError = function(message) {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions-events.js"]._cached = module.exports;
+    __require.modules["/lib/directions-events.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/footprinted-route.js"] = function () {
+require.modules["/lib/footprinted-route.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/footprinted-route.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/footprinted-route.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/footprinted-route.js"]._cached = module.exports;
+    __require.modules["/lib/footprinted-route.js"]._cached = module.exports;
     
     (function () {
         var FootprintedRoute = module.exports = function(directions) {
@@ -1861,26 +2044,26 @@ FootprintedRoute.prototype.translateEmissions = function(totalEmissions) {
 ;
     }).call(module.exports);
     
-    __require.modules["/footprinted-route.js"]._cached = module.exports;
+    __require.modules["/lib/footprinted-route.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment-factory.js"] = function () {
+require.modules["/lib/segment-factory.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/segment-factory.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/segment-factory.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment-factory.js"]._cached = module.exports;
+    __require.modules["/lib/segment-factory.js"]._cached = module.exports;
     
     (function () {
         var AmtrakingSegment = require('./segment/amtraking-segment'),
@@ -1921,26 +2104,26 @@ var SegmentFactory = module.exports = {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment-factory.js"]._cached = module.exports;
+    __require.modules["/lib/segment-factory.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/amtraking-segment.js"] = function () {
+require.modules["/lib/segment/amtraking-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/amtraking-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/amtraking-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/amtraking-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/amtraking-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -1966,7 +2149,7 @@ CM1.emitter(AmtrakingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/amtraking-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/amtraking-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -1988,7 +2171,7 @@ require.modules["/node_modules/CM1/package.json"] = function () {
     __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"CM1","version":"0.2.0","author":"Derek Kastner <dkastner@gmail.com>","description":"JavaScript API for Brighter Planet's CM1 carbon/impact calculation service","homepage":"http://github.com/brighterplanet/CM1.js","main":"lib/cm1.js","engine":"*","devDependencies":{"browserify":"*","coffeescript":"*","http-browserify":"*","jsdom":"*","sinon":"*","vows":"*"},"repository":{"type":"git","url":"https://github.com/brighterplanet/CM1.js.git"}};
+        module.exports = {"name":"CM1","version":"0.2.1","author":"Derek Kastner <dkastner@gmail.com>","description":"JavaScript API for Brighter Planet's CM1 carbon/impact calculation service","homepage":"http://github.com/brighterplanet/CM1.js","main":"lib/cm1.js","engine":"*","devDependencies":{"browserify":"*","coffeescript":"*","http-browserify":"*","jsdom":"*","sinon":"*","vows":"*"},"repository":{"type":"git","url":"https://github.com/brighterplanet/CM1.js.git"}};
     }).call(module.exports);
     
     __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
@@ -2100,7 +2283,7 @@ EmissionEstimate.prototype.toString = function() {
 
 var proxyDataProperties = function(estimate, data) {
   for (var property in data) {
-    if (property == 'clone') continue;
+    if (property == 'clone' || property == 'emitter') continue;
     estimate[property] = data[property];
   }
 };
@@ -2171,9 +2354,9 @@ EmissionEstimator.prototype.params = function() {
 EmissionEstimator.prototype.getEmissionEstimate = function(callback) {
   var emitter = this.emitter;
   var req = http.request({
-    host: this.host, port: 80, path: this.path,
+    host: this.host, port: 80, path: this.path(),
     method: 'POST',
-    headers: { ContentType: 'application/json' }
+    headers: { 'content-type': 'application/json' }
   }, function (res) {
     var data = '';
     res.on('data', function (buf) {
@@ -2200,22 +2383,22 @@ EmissionEstimator.prototype.getEmissionEstimate = function(callback) {
     return module.exports;
 };
 
-require.modules["/segment/hop-stop-segment.js"] = function () {
+require.modules["/lib/segment/hop-stop-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/hop-stop-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/hop-stop-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/hop-stop-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/hop-stop-segment.js"]._cached = module.exports;
     
     (function () {
         var Segment = require('../segment');
@@ -2230,52 +2413,52 @@ HopStopSegment.prototype.durationInMinutes = function() {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/hop-stop-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/hop-stop-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment.js"] = function () {
+require.modules["/lib/segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/segment.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/segment.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment.js"]._cached = module.exports;
     
     (function () {
         var Segment = module.exports = function() {};
 ;
     }).call(module.exports);
     
-    __require.modules["/segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/bicycling-segment.js"] = function () {
+require.modules["/lib/segment/bicycling-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/bicycling-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/bicycling-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/bicycling-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/bicycling-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2301,26 +2484,26 @@ BicyclingSegment.prototype.getEmissionEstimate = function(callback) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/bicycling-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/bicycling-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/bussing-segment.js"] = function () {
+require.modules["/lib/segment/bussing-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/bussing-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/bussing-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/bussing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/bussing-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2347,26 +2530,26 @@ CM1.emitter(BussingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/bussing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/bussing-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/commuter-railing-segment.js"] = function () {
+require.modules["/lib/segment/commuter-railing-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/commuter-railing-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/commuter-railing-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/commuter-railing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/commuter-railing-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2392,26 +2575,26 @@ CM1.emitter(CommuterRailingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/commuter-railing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/commuter-railing-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/driving-segment.js"] = function () {
+require.modules["/lib/segment/driving-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/driving-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/driving-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/driving-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/driving-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2435,26 +2618,26 @@ CM1.emitter(DrivingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/driving-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/driving-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/flying-segment.js"] = function () {
+require.modules["/lib/segment/flying-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/flying-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/flying-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/flying-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/flying-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2478,26 +2661,26 @@ CM1.emitter(FlyingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/flying-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/flying-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/light-railing-segment.js"] = function () {
+require.modules["/lib/segment/light-railing-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/light-railing-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/light-railing-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/light-railing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/light-railing-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2523,26 +2706,26 @@ CM1.emitter(LightRailingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/light-railing-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/light-railing-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/subwaying-segment.js"] = function () {
+require.modules["/lib/segment/subwaying-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/subwaying-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/subwaying-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/subwaying-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/subwaying-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2569,26 +2752,26 @@ CM1.emitter(SubwayingSegment, function(emitter) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/subwaying-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/subwaying-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/segment/walking-segment.js"] = function () {
+require.modules["/lib/segment/walking-segment.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/segment";
-    var __filename = "/segment/walking-segment.js";
+    var __dirname = "/lib/segment";
+    var __filename = "/lib/segment/walking-segment.js";
     
     var require = function (file) {
-        return __require(file, "/segment");
+        return __require(file, "/lib/segment");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/segment");
+        return __require.resolve(name, "/lib/segment");
     };
     
     require.modules = __require.modules;
-    __require.modules["/segment/walking-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/walking-segment.js"]._cached = module.exports;
     
     (function () {
         var CM1 = require('CM1'),
@@ -2615,26 +2798,26 @@ WalkingSegment.prototype.getEmissionEstimate = function(callback) {
 ;
     }).call(module.exports);
     
-    __require.modules["/segment/walking-segment.js"]._cached = module.exports;
+    __require.modules["/lib/segment/walking-segment.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/time-formatter.js"] = function () {
+require.modules["/lib/time-formatter.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/time-formatter.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/time-formatter.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/time-formatter.js"]._cached = module.exports;
+    __require.modules["/lib/time-formatter.js"]._cached = module.exports;
     
     (function () {
         var TimeFormatter = module.exports = {
@@ -2675,26 +2858,26 @@ require.modules["/time-formatter.js"] = function () {
 ;
     }).call(module.exports);
     
-    __require.modules["/time-formatter.js"]._cached = module.exports;
+    __require.modules["/lib/time-formatter.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions/google-directions-route.js"] = function () {
+require.modules["/lib/directions/google-directions-route.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/directions";
-    var __filename = "/directions/google-directions-route.js";
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/google-directions-route.js";
     
     var require = function (file) {
-        return __require(file, "/directions");
+        return __require(file, "/lib/directions");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/directions");
+        return __require.resolve(name, "/lib/directions");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions/google-directions-route.js"]._cached = module.exports;
+    __require.modules["/lib/directions/google-directions-route.js"]._cached = module.exports;
     
     (function () {
         var GoogleDirectionsRoute = module.exports = function(hopstopData) {
@@ -2792,26 +2975,26 @@ GoogleDirectionsRoute.generateSteps = function(steps) {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions/google-directions-route.js"]._cached = module.exports;
+    __require.modules["/lib/directions/google-directions-route.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/number-formatter.js"] = function () {
+require.modules["/lib/number-formatter.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/number-formatter.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/number-formatter.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/number-formatter.js"]._cached = module.exports;
+    __require.modules["/lib/number-formatter.js"]._cached = module.exports;
     
     (function () {
         var NumberFormatter = module.exports  = {
@@ -2825,26 +3008,26 @@ require.modules["/number-formatter.js"] = function () {
 ;
     }).call(module.exports);
     
-    __require.modules["/number-formatter.js"]._cached = module.exports;
+    __require.modules["/lib/number-formatter.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions/google-directions.js"] = function () {
+require.modules["/lib/directions/google-directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/directions";
-    var __filename = "/directions/google-directions.js";
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/google-directions.js";
     
     var require = function (file) {
-        return __require(file, "/directions");
+        return __require(file, "/lib/directions");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/directions");
+        return __require.resolve(name, "/lib/directions");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions/google-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/google-directions.js"]._cached = module.exports;
     
     (function () {
         var Directions = require('../directions');
@@ -2903,26 +3086,26 @@ GoogleDirections.events = {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions/google-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/google-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions/hop-stop-directions.js"] = function () {
+require.modules["/lib/directions/hop-stop-directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/directions";
-    var __filename = "/directions/hop-stop-directions.js";
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/hop-stop-directions.js";
     
     var require = function (file) {
-        return __require(file, "/directions");
+        return __require(file, "/lib/directions");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/directions");
+        return __require.resolve(name, "/lib/directions");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions/hop-stop-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/hop-stop-directions.js"]._cached = module.exports;
     
     (function () {
         var Directions = require('../directions'),
@@ -3018,26 +3201,26 @@ HopStopDirections.events.processHopStop = function(directions, callback) {
 ;
     }).call(module.exports);
     
-    __require.modules["/directions/hop-stop-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/hop-stop-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/hootroot-api.js"] = function () {
+require.modules["/lib/hootroot-api.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "/hootroot-api.js";
+    var __dirname = "/lib";
+    var __filename = "/lib/hootroot-api.js";
     
     var require = function (file) {
-        return __require(file, "/");
+        return __require(file, "/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/");
+        return __require.resolve(name, "/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/hootroot-api.js"]._cached = module.exports;
+    __require.modules["/lib/hootroot-api.js"]._cached = module.exports;
     
     (function () {
         var http = require('http');
@@ -3045,13 +3228,13 @@ require.modules["/hootroot-api.js"] = function () {
 var HootrootApi = module.exports = {
   hopstop: function(params, callback) {
     var query  = '?x1=' + params.x1;
+        query += '&y1=' + params.y1;
         query += '&x2=' + params.x2;
-        query += '&y1=' + params.y1;
-        query += '&y1=' + params.y1;
+        query += '&y2=' + params.y2;
         query += '&mode=' + params.mode;
         query += '&when=' + params.when;
     var request = http.request({
-      host: 'hootroot.com', port: 80, path: '/hopstops' + query,
+      host: 'cm1-route.brighterplanet.com', port: 80, path: '/hopstops' + query,
       method: 'GET',
       headers: { ContentType: 'application/json' }
     }, function (response) {
@@ -3087,26 +3270,26 @@ var HootrootApi = module.exports = {
 ;
     }).call(module.exports);
     
-    __require.modules["/hootroot-api.js"]._cached = module.exports;
+    __require.modules["/lib/hootroot-api.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/directions/direct-rail-directions.js"] = function () {
+require.modules["/lib/directions/direct-rail-directions.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/directions";
-    var __filename = "/directions/direct-rail-directions.js";
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/direct-rail-directions.js";
     
     var require = function (file) {
-        return __require(file, "/directions");
+        return __require(file, "/lib/directions");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/directions");
+        return __require.resolve(name, "/lib/directions");
     };
     
     require.modules = __require.modules;
-    __require.modules["/directions/direct-rail-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
     
     (function () {
         var Directions = require('../directions'),
@@ -3190,7 +3373,7 @@ module.exports = DirectRailDirections;
 ;
     }).call(module.exports);
     
-    __require.modules["/directions/direct-rail-directions.js"]._cached = module.exports;
+    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -3200,78 +3383,13 @@ process.nextTick(function () {
     var module = { exports : {} };
     var exports = module.exports;
     var __dirname = "/";
-    var __filename = "//Users/dkastner/cm1-route/lib";
+    var __filename = "//Users/dkastner/cm1-route";
     
     var require = function (file) {
         return __require(file, "/");
     };
     require.modules = __require.modules;
     
-    if(!process.env) process.env = {};
-
-var DirectionsFactory = require('./directions-factory'),
-    DirectRailDirections = require('./directions/direct-rail-directions'),
-    FlyingDirections = require('./directions/flying-directions'),
-    FootprintedRoute = require('./footprinted-route'),
-    GoogleDirections = require('./directions/google-directions'),
-    HopStopDirections = require('./directions/hop-stop-directions');
-
-var Cm1Route = module.exports = {
-  NumberFormatter: require('./number-formatter'),
-  DirectionsFactory: DirectionsFactory,
-  FlyingDirections: FlyingDirections,
-  GoogleDirections: GoogleDirections,
-  HopStopDirections: HopStopDirections,
-  DirectRailDirections: DirectRailDirections,
-
-  // Get driving directions and associated emissions
-  drive: function(origin, destination, callback) {
-    var directions = new GoogleDirections(origin, destination, 'DRIVING');
-    directions.routeWithEmissions(events.translateRouteCallback(callback));
-  },
-
-  // Get flying directions and associated emissions
-  flight: function(origin, destination, callback) {
-    var directions = new FlyingDirections(origin, destination);
-    directions.routeWithEmissions(events.translateRouteCallback(callback));
-  },
-
-  // Get transit (bus, rail) directions and associated emissions
-  transit: function(origin, destination, when, callback) {
-    var directions = new HopStopDirections(origin, destination, 'PUBLICTRANSIT', when);
-    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
-  },
-
-  shouldDefaultTransitToDirectRoute: function(err) {
-    err = err ? err : false;
-    var walkingError = (err && err.name == 'AllWalkingSegmentsError');
-    return (walkingError && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
-  }
-};
-
-var events = {
-  translateRouteCallback: function(callback) {
-    return function(err, directions) {
-      if(err) {
-        callback(err);
-      } else {
-        callback(err, new FootprintedRoute(directions));
-      }
-    };
-  },
-
-  transitRailFallbackCallback: function(callback) {
-    return function(err, hopStopDirections) {
-      if(Cm1Route.shouldDefaultTransitToDirectRoute(err)) {
-        console.log('falling back to direct rail');
-        var directDirections = new DirectRailDirections(
-            hopStopDirections.origin, hopStopDirections.destination);
-        directDirections.routeWithEmissions(events.translateRouteCallback(callback));
-      } else {
-        callback(err, new FootprintedRoute(hopStopDirections));
-      }
-    };
-  }
-};
+    Cm1Route = require('./lib/cm1-route');
 ;
 });
