@@ -12,6 +12,7 @@ var GoogleDirectionsRoute = require('../../lib/directions/google-directions-rout
 var directions = new HopStopDirections('A','B','WALKING','now');
 
 var goodDirections = new HopStopDirections('A','B');
+goodDirections.storeRoute({routes: [{ legs: [HopStopResult.realSubway] }]});
 sinon.stub(goodDirections, 'isAllWalkingSegments').returns(false);
 sinon.stub(goodDirections.geocoder, 'geocode').
   yields(directionsBehavior.geocodedOrigin,
@@ -26,8 +27,8 @@ var fakeweb = require('fakeweb'),
     http = require('http');
 
 http.register_intercept({
-  uri: '/hopstops?x1=1&y1=2&x2=3&y2=4&mode=SUBWAYING&when=now', 
-  host: 'hootroot.com',
+  uri: '/hopstops?x1=1&y1=1&x2=1&y2=1&mode=PUBLICTRANSIT&when=now', 
+  host: 'cm1-route.brighterplanet.com',
   body: JSON.stringify(HopStopResult.subway)
 });
 
@@ -42,7 +43,7 @@ vows.describe('HopStopDirections').addBatch({
         new WalkingSegment(0, {}),
         new WalkingSegment(0, {}),
         new WalkingSegment(0, {}),
-        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {})
       ];
 
       assert.isTrue(directions.isAllWalkingSegments());
@@ -52,7 +53,7 @@ vows.describe('HopStopDirections').addBatch({
         new WalkingSegment(0, {}),
         new WalkingSegment(0, {}),
         new SubwayingSegment(0, {}),
-        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {})
       ];
 
       assert.isFalse(directions.isAllWalkingSegments());
