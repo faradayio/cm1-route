@@ -6,7 +6,7 @@ task 'build', 'Build client-side cm1-route.js using browserify', ->
   console.log "Browserifying..."
   b = browserify {
     require: { http: 'http-browserify' },
-    entry: 'lib/cm1-route.js'
+    entry: 'browser.js'
   }
   fs.writeFileSync 'cm1-route.js', b.bundle()
   console.log 'CM1Route is now browserified in cm1-route.js'
