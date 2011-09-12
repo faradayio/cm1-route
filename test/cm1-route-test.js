@@ -33,17 +33,9 @@ var providesRoutingCallback = function(mode, args, extraVows) {
       'returns null for err': function(err) {
         assert.isNull(err);
       },
-      'provides .distance': function(err, data) {
-        assert.isNumber(data.distance);
+      'provides directions': function(err, data) {
+        assert.instanceOf(data, Directions);
       },
-      'provides .route': function(err, data) {
-        assert.instanceOf(data.directions, google.maps.Directions);
-      },
-      'provides .emissions': function(err, data) {
-        assert.isNumber(data.emissions.tons);
-        assert.isNumber(data.emissions.pounds);
-        assert.isNumber(data.emissions.kilograms);
-      }
     },
     'on error': sinon.testCase({
       topic: function() {

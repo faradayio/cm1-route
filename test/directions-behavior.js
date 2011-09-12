@@ -2,8 +2,8 @@ var Directions = require('../lib/directions'),
     Segment = require('../lib/segment');
 
 module.exports = {
-  providesRoute: function(goodDirections, badDirections) {
-    return {
+  providesRoute: function(goodDirections, badDirections, extraVows) {
+    var batch = {
       'on success': {
         topic: function() {
           goodDirections.route(this.callback);
@@ -27,8 +27,10 @@ module.exports = {
         'sends an Error object in err': function(err) {
           assert.isString(err.message);
         }
-      }
+      },
     };
+    if(extraVows) batch['and also'] = extraVows;
+    return batch;
   },
 
   proviesStoreRoute: function(directions) {

@@ -1,9 +1,12 @@
 require('../helper');
+var async = require('async');
+
 var GoogleResult = require('../fixtures/google-result'),
     HopStopResult = require('../fixtures/hop-stop-result');
 var directionsBehavior = require('../directions-behavior');
 
-var GoogleDirectionsRoute = require('../../lib/directions/google-directions-route'),
+var Directions = require('../../lib/directions'),
+    GoogleDirectionsRoute = require('../../lib/directions/google-directions-route'),
     HootrootApi = require('../../lib/hootroot-api'),
     HopStopDirections = require('../../lib/directions/hop-stop-directions')
     SubwayingSegment = require('../../lib/segment/subwaying-segment'),
@@ -33,42 +36,31 @@ http.register_intercept({
 });
 
 vows.describe('HopStopDirections').addBatch({
-  '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
-  '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
-  '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
-
-  '#routeWithEmissions': sinon.testCase({
+  '#route': directionsBehavior.providesRoute(goodDirections, badDirections, sinon.testCase({
     'uses railCallbackFallback event for SUBWAYING': function() {
-      sinon.stub(directions, 'route');
+      sinon.stub(async, 'parallel');
       sinon.spy(HopStopDirections.events, 'railFallbackCallback');
       directions.mode = 'SUBWAYING';
-      directions.routeWithEmissions(sinon.stub());
+      directions.route(sinon.stub());
       sinon.assert.called(HopStopDirections.events.railFallbackCallback);
 
-      directions.route.restore();
+      async.parallel.restore();
       HopStopDirections.events.railFallbackCallback.restore();
     },
     'uses busFallbackCallback event for BUSSING': function() {
-      sinon.stub(directions, 'route');
+      sinon.stub(async, 'parallel');
       sinon.spy(HopStopDirections.events, 'busFallbackCallback');
       directions.mode = 'BUSSING';
-      directions.routeWithEmissions(sinon.stub());
+      directions.route(sinon.stub());
       sinon.assert.called(HopStopDirections.events.busFallbackCallback);
 
-      directions.route.restore();
+      async.parallel.restore();
       HopStopDirections.events.busFallbackCallback.restore();
-    },
-    'uses plain old translateRouteCallback event for PUBLICTRANSIT': function() {
-      sinon.stub(directions, 'route');
-      sinon.spy(HopStopDirections.events, 'translateRouteCallback');
-      directions.mode = 'PUBLICTRANSIT';
-      directions.routeWithEmissions(sinon.stub());
-      sinon.assert.called(HopStopDirections.events.translateRouteCallback);
-
-      directions.route.restore();
-      HopStopDirections.events.translateRouteCallback.restore();
     }
-  }),
+  })),
+
+  '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
+  '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
   '#isAllWalkingSegments': {
     'returns true if all segments are walking segments': function() {

@@ -2,8 +2,7 @@ require('./helper');
 var Cm1Result = require('./fixtures/cm1-result'),
     GoogleResult = require('./fixtures/google-result');
 
-var Directions = require('../lib/directions'),
-    FootprintedRoute = require('../lib/footprinted-route');
+var Directions = require('../lib/directions');
 
 var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
 directions.calculateDistance = sinon.stub();
@@ -41,48 +40,6 @@ vows.describe('Directions').addBatch({
     },
     'calls back for each segment': function(err, directions) {
       assert.equal(directions.segmentEmissionsCallback.callCount, directions.segments.length);
-    }
-  },
-
-  '#routeWithEmissions': {
-    'on success': {
-      topic: function() {
-        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
-        directions.calculateDistance = sinon.stub();
-        directions.storeRoute(GoogleResult.driving);
-        directions.route = function(callback) {
-          callback(null, directions);
-        };
-        directions.eachSegment(function(segment) {
-          sinon.spy(segment, 'getEmissionEstimate', function(callback) {
-            segment.emissionEstimate = {};
-            callback(null, segment);
-          });
-        });
-
-        directions.routeWithEmissions(this.callback);
-      },
-      
-      'calls back with directions having routing information': function(err, directions) {
-        assert.isNotEmpty(directions.segments);
-      },
-      'calls back with directions having emissions information': function(err, directions) {
-        directions.eachSegment(function(segment) {
-          assert.isObject(segment.emissionEstimate);
-        });
-      }
-    },
-    'on failure': {
-      topic: function() {
-        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
-        directions.calculateDistance = sinon.stub();
-        directions.route = function(callback) { callback(new Error('arg')); };
-        directions.routeWithEmissions(this.callback);
-      },
-
-      'calls back with an error if routing/emissions fail': function(err) {
-        assert.instanceOf(err, Error);
-      }
     }
   },
 
