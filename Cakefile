@@ -2,7 +2,7 @@ browserify = require 'browserify'
 child = require 'child_process'
 fs = require 'fs'
 
-task 'build', 'Build client-side cm1-route.js using browserify', ->
+task 'bake', 'Build client-side cm1-route.js using browserify', ->
   console.log "Browserifying..."
   b = browserify {
     require: { http: 'http-browserify' },
