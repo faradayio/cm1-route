@@ -37,6 +37,39 @@ vows.describe('HopStopDirections').addBatch({
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
   '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
+  '#routeWithEmissions': sinon.testCase({
+    'uses railCallbackFallback event for SUBWAYING': function() {
+      sinon.stub(directions, 'route');
+      sinon.spy(HopStopDirections.events, 'railFallbackCallback');
+      directions.mode = 'SUBWAYING';
+      directions.routeWithEmissions(sinon.stub());
+      sinon.assert.called(HopStopDirections.events.railFallbackCallback);
+
+      directions.route.restore();
+      HopStopDirections.events.railFallbackCallback.restore();
+    },
+    'uses busFallbackCallback event for BUSSING': function() {
+      sinon.stub(directions, 'route');
+      sinon.spy(HopStopDirections.events, 'busFallbackCallback');
+      directions.mode = 'BUSSING';
+      directions.routeWithEmissions(sinon.stub());
+      sinon.assert.called(HopStopDirections.events.busFallbackCallback);
+
+      directions.route.restore();
+      HopStopDirections.events.busFallbackCallback.restore();
+    },
+    'uses plain old translateRouteCallback event for PUBLICTRANSIT': function() {
+      sinon.stub(directions, 'route');
+      sinon.spy(HopStopDirections.events, 'translateRouteCallback');
+      directions.mode = 'PUBLICTRANSIT';
+      directions.routeWithEmissions(sinon.stub());
+      sinon.assert.called(HopStopDirections.events.translateRouteCallback);
+
+      directions.route.restore();
+      HopStopDirections.events.translateRouteCallback.restore();
+    }
+  }),
+
   '#isAllWalkingSegments': {
     'returns true if all segments are walking segments': function() {
       directions.segments = [
@@ -57,6 +90,28 @@ vows.describe('HopStopDirections').addBatch({
       ];
 
       assert.isFalse(directions.isAllWalkingSegments());
+    }
+  },
+
+  '.shouldDefaultTransitToDirectRoute': {
+    'returns true for an AllWalkingSegmentsError and TRANSIT_DIRECT_DEFAULT env is true': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new HopStopDirections.AllWalkingSegmentsError('FAIL');
+      assert.isTrue(HopStopDirections.shouldDefaultTransitToDirectRoute(err));
+    },
+    'returns false for null err': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      assert.isFalse(HopStopDirections.shouldDefaultTransitToDirectRoute(null));
+    },
+    'returns false for non-AllWalkingSegmentsError': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new Error('LULZ');
+      assert.isFalse(HopStopDirections.shouldDefaultTransitToDirectRoute(null));
+    },
+    'returns false if TRANSIT_DIRECT_DEFAULT env is false': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = false;
+      var err = new HopStopDirections.AllWalkingSegmentsError('FAIL');
+      assert.isFalse(HopStopDirections.shouldDefaultTransitToDirectRoute(err));
     }
   },
 
@@ -81,6 +136,21 @@ vows.describe('HopStopDirections').addBatch({
 
         HootrootApi.hopstop.restore();
       }
-    }
+    },
+
+    //'.railCallbackFallback': {
+      //topic: HopStopDirections.events.railFallbackCallback(sinon.stub()),
+
+      //'defaults to straight line distance if no route is found': function(rcf) {
+        //sinon.stub(Cm1Route, 'shouldDefaultTransitToDirectRoute').returns(true);
+
+        //var err = 
+        //rcf(err, {});
+
+        //assert.equal(data.directions.length, 1);
+
+        //Cm1Route.shouldDefaultTransitToDirectRoute.restore();
+      //}
+    //}
   })
 }).export(module, { error: false });

@@ -74,36 +74,5 @@ vows.describe('Cm1Route').addBatch({
   '#drive': providesRoutingCallback('drive', ['Lansing, MI', 'Chicago, IL']),
   '#flight': providesRoutingCallback('flight', ['Lansing, MI', 'Chicago, IL']),
   '#transit': providesRoutingCallback('transit', ['Lansing, MI', 'Chicago, IL', 'Mon 12am'], sinon.testCase({
-    'defaults to straight line distance if no route is found': function() {
-      sinon.stub(Cm1Route, 'shouldDefaultTransitToDirectRoute').returns(true);
-
-      Cm1Route.transit('Lansing, MI', 'Chicago, IL', 'Mon 12am', function(err, data) {
-        assert.equal(data.directions.length, 1);
-      });
-
-      Cm1Route.shouldDefaultTransitToDirectRoute.restore();
-    }
-  })),
-
-  '#shouldDefaultTransitToDirectRoute': {
-    'returns true for an AllWalkingSegmentsError and TRANSIT_DIRECT_DEFAULT env is true': function() {
-      process.env.TRANSIT_DIRECT_DEFAULT = true;
-      var err = new HopStopDirections.AllWalkingSegmentsError('FAIL');
-      assert.isTrue(Cm1Route.shouldDefaultTransitToDirectRoute(err));
-    },
-    'returns false for null err': function() {
-      process.env.TRANSIT_DIRECT_DEFAULT = true;
-      assert.isFalse(Cm1Route.shouldDefaultTransitToDirectRoute(null));
-    },
-    'returns false for non-AllWalkingSegmentsError': function() {
-      process.env.TRANSIT_DIRECT_DEFAULT = true;
-      var err = new Error('LULZ');
-      assert.isFalse(Cm1Route.shouldDefaultTransitToDirectRoute(null));
-    },
-    'returns false if TRANSIT_DIRECT_DEFAULT env is false': function() {
-      process.env.TRANSIT_DIRECT_DEFAULT = false;
-      var err = new HopStopDirections.AllWalkingSegmentsError('FAIL');
-      assert.isFalse(Cm1Route.shouldDefaultTransitToDirectRoute(err));
-    }
-  }
+  }))
 }).export(module, { error: false });
