@@ -328,7 +328,7 @@ require.modules["/node_modules/http-browserify/package.json"] = function () {
     __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"http-browserify","version":"0.0.2","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"license":"MIT/X11","engine":{"node":">=0.4"}};
+        module.exports = {"name":"http-browserify","version":"0.0.3","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"license":"MIT/X11","engine":{"node":">=0.4"}};
     }).call(module.exports);
     
     __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
@@ -730,7 +730,7 @@ var XdrRequest = function(params) {
         res.handle(xhr);
     };
     xhr.onload = function() {
-        xdr.readyState = 4;
+        xhr.readyState = 4;
         res.handle(xhr);
     };
 
@@ -908,9 +908,7 @@ require.modules["/lib/cm1-route.js"] = function () {
         if(!process.env) process.env = {};
 
 var DirectionsFactory = require('./directions-factory'),
-    DirectRailDirections = require('./directions/direct-rail-directions'),
     FlyingDirections = require('./directions/flying-directions'),
-    FootprintedRoute = require('./footprinted-route'),
     GoogleDirections = require('./directions/google-directions'),
     HopStopDirections = require('./directions/hop-stop-directions');
 
@@ -920,65 +918,33 @@ var Cm1Route = module.exports = {
   FlyingDirections: FlyingDirections,
   GoogleDirections: GoogleDirections,
   HopStopDirections: HopStopDirections,
-  DirectRailDirections: DirectRailDirections,
 
   // Get driving directions and associated emissions
   drive: function(origin, destination, callback) {
     var directions = new GoogleDirections(origin, destination, 'DRIVING');
-    directions.routeWithEmissions(events.translateRouteCallback(callback));
+    directions.route(callback);
   },
 
   // Get flying directions and associated emissions
   flight: function(origin, destination, callback) {
     var directions = new FlyingDirections(origin, destination);
-    directions.routeWithEmissions(events.translateRouteCallback(callback));
+    directions.route(callback);
   },
 
   // Get transit (bus, rail) directions and associated emissions
   transit: function(origin, destination, when, callback) {
     var directions = new HopStopDirections(origin, destination, 'PUBLICTRANSIT', when);
-    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
+    directions.route(callback);
   },
 
   rail: function(origin, destination, when, callback) {
     var directions = new HopStopDirections(origin, destination, 'SUBWAYING', when);
-    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
+    directions.route(callback);
   },
 
   bus: function(origin, destination, when, callback) {
     var directions = new HopStopDirections(origin, destination, 'BUSSING', when);
-    directions.routeWithEmissions(events.transitRailFallbackCallback(callback));
-  },
-
-  shouldDefaultTransitToDirectRoute: function(err) {
-    err = err ? err : false;
-    var walkingError = (err && err.name == 'AllWalkingSegmentsError');
-    return (walkingError && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
-  }
-};
-
-var events = {
-  translateRouteCallback: function(callback) {
-    return function(err, directions) {
-      if(err) {
-        callback(err);
-      } else {
-        callback(err, new FootprintedRoute(directions));
-      }
-    };
-  },
-
-  transitRailFallbackCallback: function(callback) {
-    return function(err, hopStopDirections) {
-      if(Cm1Route.shouldDefaultTransitToDirectRoute(err)) {
-        console.log('falling back to direct rail');
-        var directDirections = new DirectRailDirections(
-            hopStopDirections.origin, hopStopDirections.destination);
-        directDirections.routeWithEmissions(events.translateRouteCallback(callback));
-      } else {
-        callback(err, new FootprintedRoute(hopStopDirections));
-      }
-    };
+    directions.route(callback);
   }
 };
 ;
@@ -1060,6 +1026,9 @@ var FlyingDirections = module.exports = function(origin, destination) {
   this.destination = destination;
   this.mode = 'FLYING';
   this.geocoder = new google.maps.Geocoder();
+  this.geocodeOrigin = Directions.events.geocode(this, 'origin', 'originLatLng');
+  this.geocodeDestination = Directions.events.geocode(this, 'destination', 'destinationLatLng');
+  this.parameters = {};
 }
 FlyingDirections.prototype = new Directions();
 
@@ -1113,14 +1082,8 @@ FlyingDirections.events.onGeocodeFinish = function(directions, callback) {
       distance: { value: directions.distance },
       duration: { value: directions.duration() },
       instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile flight',
-      start_position: {
-        lat: directions.originLatLng.lat(),
-        lon: directions.originLatLng.lng()
-      },
-      end_position: {
-        lat: directions.destinationLatLng.lat(),
-        lon: directions.destinationLatLng.lng()
-      }
+      start_location: directions.originLatLng,
+      end_location: directions.destinationLatLng
     }];
 
     var directionsResult = { routes: [{
@@ -1165,7 +1128,6 @@ require.modules["/lib/directions.js"] = function () {
         var async = require('async');
 
 var DirectionsEvents = require('./directions-events'),
-    FootprintedRoute = require('./footprinted-route'),
     SegmentFactory = require('./segment-factory'),
     TimeFormatter = require('./time-formatter');
 
@@ -1199,9 +1161,19 @@ Directions.prototype.getEmissions = function(callback, segmentCallback) {
   this.totalEmissions = 0.0;
   directions = this;
 
+  if(this.segments.length > 0) {
+    this.getEmissionsFromSegments(callback, segmentCallback);
+  } else if(this.distance) {
+    this.getEmissionsFromDistance(callback, segmentCallback);
+  }
+};
+
+Directions.prototype.getEmissionsFromSegments = function(callback, segmentCallback) {
+  var directions = this;
   async.forEach(
     this.segments,
     function(segment, asyncCallback) {
+      segment.parameters = directions.parameters;
       segment.getEmissionEstimate(
         Directions.events.onSegmentGetEmissionEstimate(directions, segmentCallback, asyncCallback));
     },
@@ -1211,23 +1183,22 @@ Directions.prototype.getEmissions = function(callback, segmentCallback) {
   );
 };
 
+Directions.prototype.getEmissionsFromDistance = function(callback, segmentCallback) {
+  this.segments = [SegmentFactory.create(0, {
+    travel_mode: this.mode,
+    distance: { value: this.distance },
+    instructions: 'travel ' + this.distance + ' meters'
+  })];
+
+  this.getEmissions(callback, segmentCallback);
+};
+
 Directions.prototype.totalTime = function() {
   var totalTime = 0;
   this.eachSegment(function(segment) {
     totalTime += segment.duration;
   });
   return TimeFormatter.format(totalTime);
-};
-
-Directions.prototype.routeWithEmissions = function(callback) {
-  var directions = this;
-
-  async.series([
-    function(asyncCallback) { directions.route(asyncCallback); },
-    function(asyncCallback) { directions.getEmissions(asyncCallback); }
-  ], function(err) {
-    callback(err, directions);
-  });
 };
 ;
     }).call(module.exports);
@@ -2008,46 +1979,6 @@ DirectionsEvents.GeocodeError = function(message) {
     return module.exports;
 };
 
-require.modules["/lib/footprinted-route.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/footprinted-route.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/footprinted-route.js"]._cached = module.exports;
-    
-    (function () {
-        var FootprintedRoute = module.exports = function(directions) {
-  this.route = directions.steps;
-  this.distance = directions.distance;
-  this.emissions = this.translateEmissions(directions.totalEmissions);
-};
-
-FootprintedRoute.prototype.translateEmissions = function(totalEmissions) {
-  var pounds = totalEmissions * 2.20462262;
-  var tons = pounds / 2000;
-  return {
-    kilograms: totalEmissions,
-    pounds: pounds,
-    tons: tons
-  };
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/footprinted-route.js"]._cached = module.exports;
-    return module.exports;
-};
-
 require.modules["/lib/segment-factory.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
@@ -2084,6 +2015,8 @@ var SegmentFactory = module.exports = {
       return new WalkingSegment(index, step);
     } else if(step.travel_mode == 'BICYCLING') {
       return new BicyclingSegment(index, step);
+    } else if(step.travel_mode == 'PUBLICTRANSIT') {
+      return new SubwayingSegment(index, step);
     } else if(step.travel_mode == 'SUBWAYING') {
       return new SubwayingSegment(index, step);
     } else if(step.travel_mode == 'BUSSING') {
@@ -2171,7 +2104,7 @@ require.modules["/node_modules/CM1/package.json"] = function () {
     __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"CM1","version":"0.2.1","author":"Derek Kastner <dkastner@gmail.com>","description":"JavaScript API for Brighter Planet's CM1 carbon/impact calculation service","homepage":"http://github.com/brighterplanet/CM1.js","main":"lib/cm1.js","engine":"*","devDependencies":{"browserify":"*","coffeescript":"*","http-browserify":"*","jsdom":"*","sinon":"*","vows":"*"},"repository":{"type":"git","url":"https://github.com/brighterplanet/CM1.js.git"}};
+        module.exports = {"name":"CM1","version":"0.3.0","author":"Derek Kastner <dkastner@gmail.com>","description":"JavaScript API for Brighter Planet's CM1 carbon/impact calculation service","homepage":"http://github.com/brighterplanet/CM1.js","main":"lib/cm1.js","engine":"*","devDependencies":{"browserify":"*","coffeescript":"*","http-browserify":"*","jsdom":"*","sinon":"*","vows":"*"},"repository":{"type":"git","url":"https://github.com/brighterplanet/CM1.js.git"}};
     }).call(module.exports);
     
     __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
@@ -2206,7 +2139,10 @@ CM1.EmissionEstimate = EmissionEstimate;
 CM1.EmissionEstimator = EmissionEstimator;
 
 CM1.prototype.key = function() {
-  return CM1.key;
+  if(process && process.env && process.env.CM1_KEY)
+    return process.env.CM1_KEY;
+  else
+    return CM1.key;
 };
 
 CM1.emitter = function(klass, definition) {
@@ -2346,6 +2282,12 @@ EmissionEstimator.prototype.params = function() {
 
   if(this.cm1.key()) {
     params.key = this.cm1.key();
+  }
+
+  if(this.emitter.parameters) {
+    for(var i in this.emitter.parameters) {
+      params[i] = this.emitter.parameters[i];
+    }
   }
 
   return params;
@@ -2901,12 +2843,12 @@ GoogleDirectionsRoute.generateOverviewPath = function(steps) {
   var path = [];
   for(i in steps) {
     var step = steps[i];
-    if(step.start_position) {
+    if(step.start_location) {
       var startLatLng = new google.maps.LatLng(
-        step.start_position.lat, step.start_position.lon );
+        step.start_location.lat, step.start_location.lon );
       path.push(startLatLng);
       var endLatLng = new google.maps.LatLng(
-          step.end_position.lat, step.end_position.lon);
+          step.end_location.lat, step.end_location.lon);
       path.push(endLatLng);
     }
   }
@@ -2919,8 +2861,8 @@ GoogleDirectionsRoute.generateBounds = function(steps) {
 
   for(i in steps) {
     var step = steps[i];
-    coords = GoogleDirectionsRoute.recordCoords(step.start_position, coords);
-    coords = GoogleDirectionsRoute.recordCoords(step.end_position, coords);
+    coords = GoogleDirectionsRoute.recordCoords(step.start_location, coords);
+    coords = GoogleDirectionsRoute.recordCoords(step.end_location, coords);
   }
 
   if(coords.sWLat != null && coords.sWLng != null && 
@@ -2933,10 +2875,10 @@ GoogleDirectionsRoute.generateBounds = function(steps) {
   }
 };
 
-GoogleDirectionsRoute.recordCoords = function(position, coords) {
-  if(position) {
-    var lat = position.lat;
-    var lng = position.lon;
+GoogleDirectionsRoute.recordCoords = function(location, coords) {
+  if(location) {
+    var lat = location.lat;
+    var lng = location.lon;
     coords.sWLat = (coords.sWLat == null ? lat : Math.min(coords.sWLat, lat));
     coords.sWLng = (coords.sWLng == null ? lng : Math.min(coords.sWLng, lng));
     coords.nELat = (coords.nELat == null ? lat : Math.max(coords.nELat, lat));
@@ -2958,12 +2900,12 @@ GoogleDirectionsRoute.generateSteps = function(steps) {
     googleStep.travel_mode = step.travel_mode;
     googleStep.path = [];
 
-    if(step.start_position) {
-      googleStep.start_location = new google.maps.LatLng(step.start_position.lat, step.start_position.lon);
+    if(step.start_location) {
+      googleStep.start_location = new google.maps.LatLng(step.start_location.lat, step.start_location.lon);
       googleStep.path.push(googleStep.start_location);
     }
-    if(step.end_position) {
-      googleStep.end_location = new google.maps.LatLng(step.end_position.lat, step.end_position.lon);
+    if(step.end_location) {
+      googleStep.end_location = new google.maps.LatLng(step.end_location.lat, step.end_location.lon);
       googleStep.path.push(googleStep.end_location);
     }
 
@@ -3036,6 +2978,10 @@ var GoogleDirections = module.exports = function(origin, destination, mode) {
   this.origin = origin
   this.destination = destination
   this.mode = mode
+  this.geocoder = new google.maps.Geocoder();
+  this.geocodeOrigin = Directions.events.geocode(this, 'origin', 'originLatLng');
+  this.geocodeDestination = Directions.events.geocode(this, 'destination', 'destinationLatLng');
+  this.parameters = {};
 }
 GoogleDirections.prototype = new Directions
 
@@ -3055,8 +3001,8 @@ GoogleDirections.prototype.directionsService = function() {
 
 GoogleDirections.prototype.route = function(callback) {
   var request = {
-    origin: this.origin, 
-    destination: this.destination,
+    origin: this.origin || this.originLatLng,
+    destination: this.destination || this.destinationLatLng,
     travelMode: this.mode
   };
   this.directionsService().
@@ -3110,6 +3056,8 @@ require.modules["/lib/directions/hop-stop-directions.js"] = function () {
     (function () {
         var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
+    DirectBusDirections = require('./direct-bus-directions'),
+    DirectRailDirections = require('./direct-rail-directions'),
     GoogleDirectionsRoute = require('./google-directions-route'),
     HootrootApi = require('../hootroot-api'),
     WalkingSegment = require('../segment/walking-segment');
@@ -3122,6 +3070,9 @@ var HopStopDirections = module.exports = function(origin, destination, mode, whe
   this.mode = mode || 'PUBLICTRANSIT';
   this.when = when || 'now';
   this.geocoder = new google.maps.Geocoder();
+  this.geocodeOrigin = Directions.events.geocode(this, 'origin', 'originLatLng');
+  this.geocodeDestination = Directions.events.geocode(this, 'destination', 'destinationLatLng');
+  this.parameters = {};
 }
 HopStopDirections.prototype = new Directions;
 
@@ -3133,8 +3084,20 @@ HopStopDirections.AllWalkingSegmentsError = function(message) {
 
 HopStopDirections.events = new DirectionsEvents();
 
+HopStopDirections.shouldDefaultTransitToDirectRoute = function(err) {
+  err = err ? err : false;
+  var walkingError = (err && err.name == 'AllWalkingSegmentsError');
+  return (walkingError && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
+};
+
 HopStopDirections.prototype.route = function(callback) {
   var directions = this;
+
+  if(this.mode == 'SUBWAYING')
+    callback = HopStopDirections.events.railFallbackCallback(callback);
+  else if(this.mode == 'BUSSING')
+    callback = HopStopDirections.events.busFallbackCallback(callback);
+
   async.parallel({
     origin: HopStopDirections.events.geocode(this, 'origin', 'originLatLng'),
     destination: HopStopDirections.events.geocode(this, 'destination', 'destinationLatLng')
@@ -3142,9 +3105,8 @@ HopStopDirections.prototype.route = function(callback) {
     if(err) {
       callback(err, directions);
     } else {
-      async.series({
-        hopstop: HopStopDirections.events.fetchHopStop(directions),
-      }, HopStopDirections.events.processHopStop(directions, callback));
+      async.series({ hopstop: HopStopDirections.events.fetchHopStop(directions) },
+        HopStopDirections.events.processHopStop(directions, callback));
     }
   });
 };
@@ -3160,10 +3122,6 @@ HopStopDirections.prototype.isAllWalkingSegments = function() {
 HopStopDirections.prototype.calculateDistance = function() {
   this.distance = google.maps.geometry.spherical.
     computeDistanceBetween(this.originLatLng, this.destinationLatLng);
-};
-
-HopStopDirections.prototype.shouldDefaultToDirectRoute = function() {
-  return process.env && process.env.HOPSTOP_DEFAULT_DIRECT
 };
 
 
@@ -3198,10 +3156,247 @@ HopStopDirections.events.processHopStop = function(directions, callback) {
     callback(err, directions);
   };
 };
+
+HopStopDirections.events.railFallbackCallback = function(callback) {
+  return function(err, hopStopDirections) {
+    if(HopStopDirections.shouldDefaultTransitToDirectRoute(err)) {
+      console.log('falling back to direct rail');
+      var directDirections = new DirectRailDirections(
+          hopStopDirections.origin, hopStopDirections.destination);
+      directDirections.route(
+        HopStopDirections.events.copyRoutedDirections(hopStopDirections, callback));
+    } else {
+      callback(err, hopStopDirections);
+    }
+  };
+};
+
+HopStopDirections.events.busFallbackCallback = function(callback) {
+  return function(err, hopStopDirections) {
+    if(HopStopDirections.shouldDefaultTransitToDirectRoute(err)) {
+      console.log('falling back to google directions for bus');
+      var drivingDirections = new DirectBusDirections(
+          hopStopDirections.origin, hopStopDirections.destination);
+      drivingDirections.route(
+        HopStopDirections.events.copyRoutedDirections(hopStopDirections, callback));
+    } else {
+      callback(err, hopStopDirections);
+    }
+  };
+};
+
+HopStopDirections.events.copyRoutedDirections = function(originalDirections, callback) {
+  return function(err, newDirections) {
+    if(err) return callback(err, newDirections);
+
+    originalDirections.storeRoute(newDirections.directionsResult);
+    callback(null, originalDirections);
+  };
+};
 ;
     }).call(module.exports);
     
     __require.modules["/lib/directions/hop-stop-directions.js"]._cached = module.exports;
+    return module.exports;
+};
+
+require.modules["/lib/directions/direct-bus-directions.js"] = function () {
+    var module = { exports : {} };
+    var exports = module.exports;
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/direct-bus-directions.js";
+    
+    var require = function (file) {
+        return __require(file, "/lib/directions");
+    };
+    
+    require.resolve = function (file) {
+        return __require.resolve(name, "/lib/directions");
+    };
+    
+    require.modules = __require.modules;
+    __require.modules["/lib/directions/direct-bus-directions.js"]._cached = module.exports;
+    
+    (function () {
+        var Directions = require('../directions'),
+    DirectionsEvents = require('../directions-events'),
+    GoogleDirectionsRoute = require('./google-directions-route'),
+    NumberFormatter = require('../number-formatter');
+
+var async = require('async');
+
+var DirectBusDirections = function(origin, destination) {
+  this.origin = origin;
+  this.destination = destination;
+  this.mode = 'BUSSING';
+  this.geocoder = new google.maps.Geocoder();
+  this.geocodeOrigin = Directions.events.geocode(this, 'origin', 'originLatLng');
+  this.geocodeDestination = Directions.events.geocode(this, 'destination', 'destinationLatLng');
+  this.parameters = {};
+}
+DirectBusDirections.prototype = new Directions();
+
+DirectBusDirections.events = new DirectionsEvents;
+
+DirectBusDirections.prototype.route = function (callback) {
+  async.parallel({
+    origin: DirectBusDirections.events.geocode(this, 'origin', 'originLatLng'),
+    destination: DirectBusDirections.events.geocode(this, 'destination', 'destinationLatLng')
+  }, DirectBusDirections.events.onGeocodeFinish(this, callback));
+};
+
+DirectBusDirections.prototype.calculateDistance = function() {
+  this.distance = google.maps.geometry.spherical.
+    computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+};
+
+DirectBusDirections.prototype.duration = function() {
+  var rate = 0.0008067;  // that's like 55mph
+  return rate * this.distance;
+};
+
+DirectBusDirections.prototype.totalTime = function() {
+  return TimeFormatter.format(this.duration());
+};
+
+
+// Events
+
+DirectBusDirections.events.onGeocodeFinish = function(directions, callback) {
+  return function(err) {
+    if(err) return callback(err, directions);
+
+    directions.calculateDistance();
+
+    var steps = [{
+      travel_mode: 'BUSSING',
+      distance: { value: directions.distance },
+      duration: { value: directions.duration() },
+      instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile bus trip',
+      start_location: directions.originLatLng,
+      end_location: directions.destinationLatLng,
+    }];
+
+    var directionsResult = { routes: [{
+      legs: [{
+        duration: { value: directions.duration() },
+        distance: { value: directions.distance },
+        steps: steps
+      }],
+      warnings: [],
+      bounds: GoogleDirectionsRoute.generateBounds(steps)
+    }]};
+    directions.storeRoute(directionsResult);
+
+    callback(null, directions);
+  };
+};
+
+module.exports = DirectBusDirections;
+;
+    }).call(module.exports);
+    
+    __require.modules["/lib/directions/direct-bus-directions.js"]._cached = module.exports;
+    return module.exports;
+};
+
+require.modules["/lib/directions/direct-rail-directions.js"] = function () {
+    var module = { exports : {} };
+    var exports = module.exports;
+    var __dirname = "/lib/directions";
+    var __filename = "/lib/directions/direct-rail-directions.js";
+    
+    var require = function (file) {
+        return __require(file, "/lib/directions");
+    };
+    
+    require.resolve = function (file) {
+        return __require.resolve(name, "/lib/directions");
+    };
+    
+    require.modules = __require.modules;
+    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
+    
+    (function () {
+        var Directions = require('../directions'),
+    DirectionsEvents = require('../directions-events'),
+    GoogleDirectionsRoute = require('./google-directions-route'),
+    NumberFormatter = require('../number-formatter');
+
+var async = require('async');
+
+var DirectRailDirections = function(origin, destination) {
+  this.origin = origin;
+  this.destination = destination;
+  this.mode = 'SUBWAYING';
+  this.geocoder = new google.maps.Geocoder();
+  this.geocodeOrigin = Directions.events.geocode(this, 'origin', 'originLatLng');
+  this.geocodeDestination = Directions.events.geocode(this, 'destination', 'destinationLatLng');
+  this.parameters = {};
+}
+DirectRailDirections.prototype = new Directions();
+
+DirectRailDirections.events = new DirectionsEvents;
+
+DirectRailDirections.prototype.route = function (callback) {
+  async.parallel({
+    origin: DirectRailDirections.events.geocode(this, 'origin', 'originLatLng'),
+    destination: DirectRailDirections.events.geocode(this, 'destination', 'destinationLatLng')
+  }, DirectRailDirections.events.onGeocodeFinish(this, callback));
+};
+
+DirectRailDirections.prototype.calculateDistance = function() {
+  this.distance = google.maps.geometry.spherical.
+    computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+};
+
+DirectRailDirections.prototype.duration = function() {
+  var rate = 0.0011;  // that's like 75mph
+  return rate * this.distance;
+}
+
+DirectRailDirections.prototype.totalTime = function() {
+  return TimeFormatter.format(this.duration());
+};
+
+
+// Events
+
+DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
+  return function(err) {
+    if(err) return callback(err, directions);
+
+    directions.calculateDistance();
+
+    var steps = [{
+      travel_mode: 'AMTRAKING',
+      distance: { value: directions.distance },
+      duration: { value: directions.duration() },
+      instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile rail trip',
+      start_location: directions.originLatLng,
+      end_location: directions.destinationLatLng,
+    }];
+
+    var directionsResult = { routes: [{
+      legs: [{
+        duration: { value: directions.duration() },
+        distance: { value: directions.distance },
+        steps: steps
+      }],
+      warnings: [],
+      bounds: GoogleDirectionsRoute.generateBounds(steps)
+    }]};
+    directions.storeRoute(directionsResult);
+
+    callback(null, directions);
+  };
+};
+
+module.exports = DirectRailDirections;
+;
+    }).call(module.exports);
+    
+    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -3271,109 +3466,6 @@ var HootrootApi = module.exports = {
     }).call(module.exports);
     
     __require.modules["/lib/hootroot-api.js"]._cached = module.exports;
-    return module.exports;
-};
-
-require.modules["/lib/directions/direct-rail-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/direct-rail-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions'),
-    DirectionsEvents = require('../directions-events'),
-    GoogleDirectionsRoute = require('./google-directions-route'),
-    NumberFormatter = require('../number-formatter');
-
-var async = require('async');
-
-var DirectRailDirections = function(origin, destination) {
-  this.origin = origin;
-  this.destination = destination;
-  this.mode = 'PUBLICTRANSIT';
-  this.geocoder = new google.maps.Geocoder();
-}
-DirectRailDirections.prototype = new Directions();
-
-DirectRailDirections.events = new DirectionsEvents;
-
-DirectRailDirections.prototype.route = function (callback) {
-  async.parallel({
-    origin: DirectRailDirections.events.geocode(this, 'origin', 'originLatLng'),
-    destination: DirectRailDirections.events.geocode(this, 'destination', 'destinationLatLng')
-  }, DirectRailDirections.events.onGeocodeFinish(this, callback));
-};
-
-DirectRailDirections.prototype.calculateDistance = function() {
-  this.distance = google.maps.geometry.spherical.
-    computeDistanceBetween(this.originLatLng, this.destinationLatLng);
-};
-
-DirectRailDirections.prototype.duration = function() {
-  var rate = 0.0011;  // that's like 75mph
-  return rate * this.distance;
-}
-
-DirectRailDirections.prototype.totalTime = function() {
-  return TimeFormatter.format(this.duration());
-};
-
-
-// Events
-
-DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
-  return function(err) {
-    if(err) return callback(err, directions);
-
-    directions.calculateDistance();
-
-    var steps = [{
-      travel_mode: 'AMTRAKING',
-      distance: { value: directions.distance },
-      duration: { value: directions.duration() },
-      instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile rail trip',
-      start_position: {
-        lat: directions.originLatLng.lat(),
-        lon: directions.originLatLng.lng()
-      },
-      end_position: {
-        lat: directions.destinationLatLng.lat(),
-        lon: directions.destinationLatLng.lng()
-      }
-    }];
-
-    var directionsResult = { routes: [{
-      legs: [{
-        duration: { value: directions.duration() },
-        distance: { value: directions.distance },
-        steps: steps
-      }],
-      warnings: [],
-      bounds: GoogleDirectionsRoute.generateBounds(steps)
-    }]};
-    directions.storeRoute(directionsResult);
-
-    callback(null, directions);
-  };
-};
-
-module.exports = DirectRailDirections;
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
     return module.exports;
 };
 
