@@ -8,11 +8,11 @@ var HopStopResult = module.exports ={
       { travel_mode: 'WALKING',
         duration: { text: '53 mins', value: 32400 },
         instructions: 'Start out going North West on Broadway towards Mother Gaston Blvd',
-        start_position: {
+        start_location: {
           lat: 40.6819,
           lon: -73.90871
         },
-        end_position: {
+        end_location: {
           lat: 40.68265,
           lon: -73.91002
         }
@@ -36,11 +36,11 @@ var HopStopResult = module.exports ={
         distance: { value: 154 },
         duration: { value: 18 },
         instructions: 'Exit near intersection of E 32nd St and Park Ave',
-        start_position: {
+        start_location: {
           lat: 40.74577,
           lon: -73.98222
         },
-        end_position: {
+        end_location: {
           lat: 40.746824,
           lon: -73.983644
         }
@@ -57,11 +57,11 @@ var HopStopResult = module.exports ={
       { travel_mode: 'WALKING',
         duration: { value: 54 },
         instructions: 'Go there',
-        start_position: {
+        start_location: {
           lat: 23.546,
           lon: -123.54
         },
-        end_position: {
+        end_location: {
           lat: 23.546,
           lon: -123.54
         }
@@ -69,11 +69,11 @@ var HopStopResult = module.exports ={
       { travel_mode: 'SUBWAYING',
         duration: { value: 688 },
         instructions: 'Go there',
-        start_position: {
+        start_location: {
           lat: 23.546,
           lon: -123.54
         },
-        end_position: {
+        end_location: {
           lat: 23.546,
           lon: -123.54
         }
@@ -81,11 +81,11 @@ var HopStopResult = module.exports ={
       { travel_mode: 'WALKING',
         duration: { value: 298 },
         instructions: 'Go there',
-        start_position: {
+        start_location: {
           lat: 23.546,
           lon: -123.54
         },
-        end_position: {
+        end_location: {
           lat: 23.546,
           lon: -123.54
         }
@@ -101,11 +101,11 @@ var HopStopResult = module.exports ={
       { travel_mode: 'WALKING',
         duration: { text: '53 mins', value: 32400 },
         instructions: 'Start out going North West on Broadway towards Mother Gaston Blvd',
-        start_position: {
+        start_location: {
           lat: 40.6819,
           lon: -73.90871
         },
-        end_position: {
+        end_location: {
           lat: 40.68265,
           lon: -73.91002
         }
@@ -119,11 +119,11 @@ var HopStopResult = module.exports ={
         distance: { value: 154 },
         duration: { value: 10 },
         instructions: 'Exit near intersection of E 32nd St and Park Ave',
-        start_position: {
+        start_location: {
           lat: 40.74577,
           lon: -73.98222
         },
-        end_position: {
+        end_location: {
           lat: 40.746824,
           lon: -73.983644
         }
