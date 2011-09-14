@@ -60,7 +60,7 @@ global.google = {
     },
     geometry: {
       spherical: {
-        computeDistanceBetween: function(a, b) { return 764872.7 }
+        computeDistanceBetween: function(a, b) { return 764872.7; }
       }
     }
   }
