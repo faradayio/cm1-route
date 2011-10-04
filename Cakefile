@@ -1,11 +1,11 @@
-browserify = require 'browserify'
+browserify = require 'dkastner-browserify'
 child = require 'child_process'
 fs = require 'fs'
 
 task 'bake', 'Build client-side cm1-route.js using browserify', ->
   console.log "Browserifying..."
   b = browserify {
-    require: { http: 'http-browserify' },
+    require: { http: 'dkastner-http-browserify' },
     entry: 'browser.js'
   }
   fs.writeFileSync 'cm1-route.js', b.bundle()
