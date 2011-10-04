@@ -1048,8 +1048,9 @@ FlyingDirections.prototype.route = function (callback) {
 };
 
 FlyingDirections.prototype.calculateDistance = function() {
-  this.distance = google.maps.geometry.spherical.
+  this.distanceInMeters = google.maps.geometry.spherical.
     computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+  this.distance = this.distanceInMeters / 1000;
 };
 
 FlyingDirections.prototype.duration = function() {
@@ -1062,7 +1063,7 @@ FlyingDirections.prototype.totalTime = function() {
 };
 
 FlyingDirections.prototype.isLongEnough = function() {
-  return this.distance > 115000;
+  return this.distance > 115;
 };
 
 
@@ -1079,7 +1080,7 @@ FlyingDirections.events.onGeocodeFinish = function(directions, callback) {
 
     var steps = [{
       travel_mode: 'FLYING',
-      distance: { value: directions.distance },
+      distance: { value: directions.distanceInMeters },
       duration: { value: directions.duration() },
       instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile flight',
       start_location: directions.originLatLng,
@@ -1089,7 +1090,7 @@ FlyingDirections.events.onGeocodeFinish = function(directions, callback) {
     var directionsResult = { routes: [{
       legs: [{
         duration: { value: directions.duration() },
-        distance: { value: directions.distance },
+        distance: { value: directions.distanceInMeters },
         steps: steps
       }],
       warnings: [],
@@ -1139,6 +1140,10 @@ var Directions = module.exports = function(origin, destination, mode) {
 
 Directions.events = new DirectionsEvents();
 
+Directions.prototype.isRouted = function() {
+  return (typeof this.directionsResult != 'undefined');
+};
+
 Directions.prototype.storeRoute = function(result) {
   this.directionsResult = result;
   this.steps = result.routes[0].legs[0].steps;
@@ -1159,9 +1164,8 @@ Directions.prototype.eachSegment = function(lambda) {
 
 Directions.prototype.getEmissions = function(callback, segmentCallback) {
   this.totalEmissions = 0.0;
-  directions = this;
 
-  if(this.segments.length > 0) {
+  if(this.segments && this.segments.length > 0) {
     this.getEmissionsFromSegments(callback, segmentCallback);
   } else if(this.distance) {
     this.getEmissionsFromDistance(callback, segmentCallback);
@@ -1184,10 +1188,11 @@ Directions.prototype.getEmissionsFromSegments = function(callback, segmentCallba
 };
 
 Directions.prototype.getEmissionsFromDistance = function(callback, segmentCallback) {
+  var distanceInMeters = this.distance * 1000;
   this.segments = [SegmentFactory.create(0, {
     travel_mode: this.mode,
-    distance: { value: this.distance },
-    instructions: 'travel ' + this.distance + ' meters'
+    distance: { value: distanceInMeters },
+    instructions: 'travel ' + distanceInMeters + ' meters'
   })];
 
   this.getEmissions(callback, segmentCallback);
@@ -2298,7 +2303,7 @@ EmissionEstimator.prototype.getEmissionEstimate = function(callback) {
   var req = http.request({
     host: this.host, port: 80, path: this.path(),
     method: 'POST',
-    headers: { 'content-type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' }
   }, function (res) {
     var data = '';
     res.on('data', function (buf) {
@@ -3011,7 +3016,8 @@ GoogleDirections.prototype.route = function(callback) {
 };
 
 GoogleDirections.prototype.calculateDistance = function() {
-  this.distance = this.directionsResult.routes[0].legs[0].distance.value;
+  this.distanceInMeters = this.directionsResult.routes[0].legs[0].distance.value;
+  this.distance = this.distanceInMeters / 1000;
 };
 
 // Events
@@ -3120,8 +3126,9 @@ HopStopDirections.prototype.isAllWalkingSegments = function() {
 };
 
 HopStopDirections.prototype.calculateDistance = function() {
-  this.distance = google.maps.geometry.spherical.
+  this.distanceInMeters = google.maps.geometry.spherical.
     computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+  this.distance = this.distanceInMeters / 1000;
 };
 
 
@@ -3246,8 +3253,9 @@ DirectBusDirections.prototype.route = function (callback) {
 };
 
 DirectBusDirections.prototype.calculateDistance = function() {
-  this.distance = google.maps.geometry.spherical.
+  this.distanceInMeters = google.maps.geometry.spherical.
     computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+  this.distance = this.distanceInMeters / 1000;
 };
 
 DirectBusDirections.prototype.duration = function() {
@@ -3270,9 +3278,9 @@ DirectBusDirections.events.onGeocodeFinish = function(directions, callback) {
 
     var steps = [{
       travel_mode: 'BUSSING',
-      distance: { value: directions.distance },
+      distance: { value: directions.distanceInMeters },
       duration: { value: directions.duration() },
-      instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile bus trip',
+      instructions: NumberFormatter.metersToMiles(directions.distanceInMeters) + ' mile bus trip',
       start_location: directions.originLatLng,
       end_location: directions.destinationLatLng,
     }];
@@ -3280,7 +3288,7 @@ DirectBusDirections.events.onGeocodeFinish = function(directions, callback) {
     var directionsResult = { routes: [{
       legs: [{
         duration: { value: directions.duration() },
-        distance: { value: directions.distance },
+        distance: { value: directions.distanceInMeters },
         steps: steps
       }],
       warnings: [],
@@ -3346,8 +3354,9 @@ DirectRailDirections.prototype.route = function (callback) {
 };
 
 DirectRailDirections.prototype.calculateDistance = function() {
-  this.distance = google.maps.geometry.spherical.
+  this.distanceInMeters = google.maps.geometry.spherical.
     computeDistanceBetween(this.originLatLng, this.destinationLatLng);
+  this.distance = this.distanceInMeters / 1000;
 };
 
 DirectRailDirections.prototype.duration = function() {
@@ -3370,9 +3379,9 @@ DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
 
     var steps = [{
       travel_mode: 'AMTRAKING',
-      distance: { value: directions.distance },
+      distance: { value: directions.distanceInMeters },
       duration: { value: directions.duration() },
-      instructions: NumberFormatter.metersToMiles(directions.distance) + ' mile rail trip',
+      instructions: NumberFormatter.metersToMiles(directions.distance) + ' km rail trip',
       start_location: directions.originLatLng,
       end_location: directions.destinationLatLng,
     }];
@@ -3380,7 +3389,7 @@ DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
     var directionsResult = { routes: [{
       legs: [{
         duration: { value: directions.duration() },
-        distance: { value: directions.distance },
+        distance: { value: directions.distanceInMeters },
         steps: steps
       }],
       warnings: [],
@@ -3431,7 +3440,7 @@ var HootrootApi = module.exports = {
     var request = http.request({
       host: 'cm1-route.brighterplanet.com', port: 80, path: '/hopstops' + query,
       method: 'GET',
-      headers: { ContentType: 'application/json' }
+      headers: { 'Accept': 'application/json' }
     }, function (response) {
       if(response.statusCode >= 300) {
         callback(new Error('HTTP request for Hopstop failed: ' + response.statusCode));
