@@ -310,47 +310,47 @@ exports.extname = function(path) {
     return module.exports;
 };
 
-require.modules["/node_modules/http-browserify/package.json"] = function () {
+require.modules["/node_modules/dkastner-http-browserify/package.json"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/node_modules/http-browserify";
-    var __filename = "/node_modules/http-browserify/package.json";
+    var __dirname = "/node_modules/dkastner-http-browserify";
+    var __filename = "/node_modules/dkastner-http-browserify/package.json";
     
     var require = function (file) {
-        return __require(file, "/node_modules/http-browserify");
+        return __require(file, "/node_modules/dkastner-http-browserify");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/http-browserify");
+        return __require.resolve(name, "/node_modules/dkastner-http-browserify");
     };
     
     require.modules = __require.modules;
-    __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"http-browserify","version":"0.0.3","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"license":"MIT/X11","engine":{"node":">=0.4"}};
+        module.exports = {"name":"dkastner-http-browserify","version":"0.0.4","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"contributors":[{"name":"Derek Kastner","email":"dkastner@gmail.com"}],"license":"MIT/X11","engine":{"node":">=0.4"}};
     }).call(module.exports);
     
-    __require.modules["/node_modules/http-browserify/package.json"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/package.json"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/node_modules/http-browserify/browser.js"] = function () {
+require.modules["/node_modules/dkastner-http-browserify/browser.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/node_modules/http-browserify";
-    var __filename = "/node_modules/http-browserify/browser.js";
+    var __dirname = "/node_modules/dkastner-http-browserify";
+    var __filename = "/node_modules/dkastner-http-browserify/browser.js";
     
     var require = function (file) {
-        return __require(file, "/node_modules/http-browserify");
+        return __require(file, "/node_modules/dkastner-http-browserify");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/http-browserify");
+        return __require.resolve(name, "/node_modules/dkastner-http-browserify");
     };
     
     require.modules = __require.modules;
-    __require.modules["/node_modules/http-browserify/browser.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/browser.js"]._cached = module.exports;
     
     (function () {
         var http = module.exports;
@@ -376,7 +376,7 @@ http.get = function (params, cb) {
 ;
     }).call(module.exports);
     
-    __require.modules["/node_modules/http-browserify/browser.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/browser.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -401,7 +401,12 @@ require.modules["events"] = function () {
         if (!process.EventEmitter) process.EventEmitter = function () {};
 
 var EventEmitter = exports.EventEmitter = process.EventEmitter;
-var isArray = Array.isArray;
+var isArray = typeof Array.isArray === 'function'
+    ? Array.isArray
+    : function (xs) {
+        return Object.toString.call(xs) === '[object Array]'
+    }
+;
 
 // By default EventEmitters will print a warning if more than
 // 10 listeners are added to it. This is a useful default which
@@ -571,22 +576,22 @@ EventEmitter.prototype.listeners = function(type) {
     return module.exports;
 };
 
-require.modules["/node_modules/http-browserify/lib/request.js"] = function () {
+require.modules["/node_modules/dkastner-http-browserify/lib/request.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/node_modules/http-browserify/lib";
-    var __filename = "/node_modules/http-browserify/lib/request.js";
+    var __dirname = "/node_modules/dkastner-http-browserify/lib";
+    var __filename = "/node_modules/dkastner-http-browserify/lib/request.js";
     
     var require = function (file) {
-        return __require(file, "/node_modules/http-browserify/lib");
+        return __require(file, "/node_modules/dkastner-http-browserify/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/http-browserify/lib");
+        return __require.resolve(name, "/node_modules/dkastner-http-browserify/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/node_modules/http-browserify/lib/request.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/lib/request.js"]._cached = module.exports;
     
     (function () {
         var EventEmitter = require('events').EventEmitter;
@@ -759,26 +764,26 @@ XdrResponse.prototype.getAllResponseHeaders = function() {
 ;
     }).call(module.exports);
     
-    __require.modules["/node_modules/http-browserify/lib/request.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/lib/request.js"]._cached = module.exports;
     return module.exports;
 };
 
-require.modules["/node_modules/http-browserify/lib/response.js"] = function () {
+require.modules["/node_modules/dkastner-http-browserify/lib/response.js"] = function () {
     var module = { exports : {} };
     var exports = module.exports;
-    var __dirname = "/node_modules/http-browserify/lib";
-    var __filename = "/node_modules/http-browserify/lib/response.js";
+    var __dirname = "/node_modules/dkastner-http-browserify/lib";
+    var __filename = "/node_modules/dkastner-http-browserify/lib/response.js";
     
     var require = function (file) {
-        return __require(file, "/node_modules/http-browserify/lib");
+        return __require(file, "/node_modules/dkastner-http-browserify/lib");
     };
     
     require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/http-browserify/lib");
+        return __require.resolve(name, "/node_modules/dkastner-http-browserify/lib");
     };
     
     require.modules = __require.modules;
-    __require.modules["/node_modules/http-browserify/lib/response.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/lib/response.js"]._cached = module.exports;
     
     (function () {
         var EventEmitter = require('events').EventEmitter;
@@ -883,7 +888,7 @@ Response.prototype.write = function (res) {
 ;
     }).call(module.exports);
     
-    __require.modules["/node_modules/http-browserify/lib/response.js"]._cached = module.exports;
+    __require.modules["/node_modules/dkastner-http-browserify/lib/response.js"]._cached = module.exports;
     return module.exports;
 };
 
@@ -917,35 +922,7 @@ var Cm1Route = module.exports = {
   DirectionsFactory: DirectionsFactory,
   FlyingDirections: FlyingDirections,
   GoogleDirections: GoogleDirections,
-  HopStopDirections: HopStopDirections,
-
-  // Get driving directions and associated emissions
-  drive: function(origin, destination, callback) {
-    var directions = new GoogleDirections(origin, destination, 'DRIVING');
-    directions.route(callback);
-  },
-
-  // Get flying directions and associated emissions
-  flight: function(origin, destination, callback) {
-    var directions = new FlyingDirections(origin, destination);
-    directions.route(callback);
-  },
-
-  // Get transit (bus, rail) directions and associated emissions
-  transit: function(origin, destination, when, callback) {
-    var directions = new HopStopDirections(origin, destination, 'PUBLICTRANSIT', when);
-    directions.route(callback);
-  },
-
-  rail: function(origin, destination, when, callback) {
-    var directions = new HopStopDirections(origin, destination, 'SUBWAYING', when);
-    directions.route(callback);
-  },
-
-  bus: function(origin, destination, when, callback) {
-    var directions = new HopStopDirections(origin, destination, 'BUSSING', when);
-    directions.route(callback);
-  }
+  HopStopDirections: HopStopDirections
 };
 ;
     }).call(module.exports);
@@ -1230,7 +1207,7 @@ require.modules["/node_modules/async/package.json"] = function () {
     __require.modules["/node_modules/async/package.json"]._cached = module.exports;
     
     (function () {
-        module.exports = {"name":"async","description":"Higher-order functions and common patterns for asynchronous code","main":"./index","author":"Caolan McMahon","version":"0.1.9","repository":{"type":"git","url":"http://github.com/caolan/async.git"},"bugs":{"web":"http://github.com/caolan/async/issues"},"licenses":[{"type":"MIT","url":"http://github.com/caolan/async/raw/master/LICENSE"}]};
+        module.exports = {"name":"async","description":"Higher-order functions and common patterns for asynchronous code","main":"./index","author":"Caolan McMahon","version":"0.1.10","repository":{"type":"git","url":"http://github.com/caolan/async.git"},"bugs":{"web":"http://github.com/caolan/async/issues"},"licenses":[{"type":"MIT","url":"http://github.com/caolan/async/raw/master/LICENSE"}]};
     }).call(module.exports);
     
     __require.modules["/node_modules/async/package.json"]._cached = module.exports;
@@ -1418,6 +1395,42 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
         };
         iterate();
     };
+    
+    async.forEachLimit = function (arr, limit, iterator, callback) {
+        if (!arr.length || limit <= 0) {
+            return callback(); 
+        }
+        var completed = 0;
+        var started = 0;
+        var running = 0;
+        
+        (function replenish () {
+          if (completed === arr.length) {
+              return callback();
+          }
+          
+          while (running < limit && started < arr.length) {
+            iterator(arr[started], function (err) {
+              if (err) {
+                  callback(err);
+                  callback = function () {};
+              }
+              else {
+                  completed += 1;
+                  running -= 1;
+                  if (completed === arr.length) {
+                      callback();
+                  }
+                  else {
+                      replenish();
+                  }
+              }
+            });
+            started += 1;
+            running += 1;
+          }
+        })();
+    };
 
 
     var doParallel = function (fn) {
@@ -1532,6 +1545,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
             iterator(x, function (result) {
                 if (result) {
                     main_callback(x);
+                    main_callback = function () {};
                 }
                 else {
                     callback();
@@ -1844,7 +1858,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
             },
             process: function () {
                 if (workers < q.concurrency && tasks.length) {
-                    var task = tasks.splice(0, 1)[0];
+                    var task = tasks.shift();
                     if(q.empty && tasks.length == 0) q.empty();
                     workers += 1;
                     worker(task.data, function () {
@@ -2303,7 +2317,7 @@ EmissionEstimator.prototype.getEmissionEstimate = function(callback) {
   var req = http.request({
     host: this.host, port: 80, path: this.path(),
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'content-type': 'application/json' }
   }, function (res) {
     var data = '';
     res.on('data', function (buf) {
@@ -3478,9 +3492,9 @@ var HootrootApi = module.exports = {
     return module.exports;
 };
 
-require.alias("http-browserify", "/node_modules/http");
+require.alias("dkastner-http-browserify", "/node_modules/http");
 
-process.nextTick(function () {
+(function () {
     var module = { exports : {} };
     var exports = module.exports;
     var __dirname = "/";
@@ -3493,4 +3507,4 @@ process.nextTick(function () {
     
     Cm1Route = require('./lib/cm1-route');
 ;
-});
+})();
