@@ -11,9 +11,9 @@
     "CM1": ">= 0.2.0"
   },
   "devDependencies": {
-    "browserify": "*",
+    "dkastner-browserify": "1.5.1",
     "fakeweb": "*",
-    "http-browserify": "http://github.com/dkastner/http-browserify/raw/master/http-browserify.tar.gz",
+    "dkastner-http-browserify": "*",
     "jsdom": "*",
     "sinon": "*",
     "vows": "*"
