@@ -11,9 +11,10 @@
     "CM1": "0.6.x"
   },
   "devDependencies": {
+    "coffee-script": "*",
     "dkastner-browserify": "1.5.1",
-    "fakeweb": "*",
     "dkastner-http-browserify": "*",
+    "fakeweb": "*",
     "jsdom": "*",
     "sinon": "*",
     "vows": "*"
