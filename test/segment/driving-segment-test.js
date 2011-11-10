@@ -5,8 +5,8 @@ var fakeweb = require('fakeweb'),
     http = require('http');
 http.register_intercept({
   uri: '/automobile_trips.json?distance=3401', 
-  host: 'carbon.brighterplanet.com',
-  body: JSON.stringify({ emission: 6.8 })
+  host: 'impact.brighterplanet.com',
+  body: JSON.stringify({ decisions: { carbon: { object: { value: 6.8 } } } })
 });
 
 var driving = new DrivingSegment(0, {
@@ -22,11 +22,11 @@ vows.describe('DrivingSegment').addBatch({
     assert.equal(driving.duration, 3401);
   },
 
-  '#getEmissionEstimate': {
+  '#getImpacts': {
     'passes an emissions parameter': function() {
       var emissions;
-      driving.getEmissionEstimate(function(err, emissionEstimate) {
-        emissions = emissionEstimate.value();
+      driving.getImpacts(function(err, impacts) {
+        emissions = impacts.carbon;
       });
       assert.equal(emissions, 6.8);
     }

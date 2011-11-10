@@ -12,7 +12,7 @@ var fakeweb = require('fakeweb'),
     http = require('http');
 http.register_intercept({
     uri: '/automobile_trips.json', 
-    host: 'carbon.brighterplanet.com',
+    host: 'impact.brighterplanet.com',
     body: JSON.stringify(Cm1Result.fit)
 });
 
@@ -23,7 +23,7 @@ vows.describe('Directions').addBatch({
       directions.calculateDistance = sinon.stub();
       directions.storeRoute(GoogleResult.driving);
       directions.eachSegment(function(segment) {
-        sinon.spy(segment, 'getEmissionEstimate');
+        sinon.spy(segment, 'getImpacts');
       });
       directions.segmentEmissionsCallback = sinon.spy();
 
@@ -32,7 +32,7 @@ vows.describe('Directions').addBatch({
     
     'gets emissions for all segments': function(err, directions) {
       directions.eachSegment(function(segment) {
-        sinon.assert.called(segment.getEmissionEstimate);
+        sinon.assert.called(segment.getImpacts);
       });
     },
     'calls back with directions when all segments have calculated emissions': function(err, directions) {
@@ -48,7 +48,7 @@ vows.describe('Directions').addBatch({
       'updates the total emissions': function() {
         var evt = Directions.events.onSegmentGetEmissionEstimate(directions, sinon.stub(), sinon.stub());
         directions.totalEmissions = 0;
-        evt(null, { value: function() { return 14254.4678; } });
+        evt(null, { carbon: 14254.4678 });
         assert.approximately(directions.totalEmissions, 14254.46, 0.01);
       }
     }

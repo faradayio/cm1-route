@@ -17,8 +17,8 @@ vows.describe('WalkingSegment').addBatch({
         instructions: 'Go here' });
       
       var emissions, step;
-      walk.getEmissionEstimate(function(err, emissionEstimate) {
-        emissions = emissionEstimate.value();
+      walk.getImpacts(function(err, impacts) {
+        emissions = impacts.carbon;
       });
 
       assert.equal(emissions, 0);
