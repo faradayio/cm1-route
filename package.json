@@ -1,6 +1,6 @@
 {
   "name": "cm1-route",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "author": "Derek Kastner <dkastner@gmail.com>",
   "description": "Routing API based on HootRoot",
   "homepage": "http://github.com/brighterplanet/cm1-route",
