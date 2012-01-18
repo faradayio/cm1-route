@@ -999,8 +999,8 @@ require.modules["/lib/directions/flying-directions.js"] = function () {
 var async = require('async');
 
 var FlyingDirections = module.exports = function(origin, destination) {
-  this.origin = FlyingDirections.translateAirport(origin);
-  this.destination = FlyingDirections.translateAirport(destination);
+  this.origin = origin;
+  this.destination = destination;
   this.mode = 'FLYING';
   this.geocoder = new google.maps.Geocoder();
   this.parameters = {};
@@ -1011,13 +1011,6 @@ FlyingDirections.RouteTooShortError = function (message) {
   this.prototype = Error.prototype;  
   this.name = 'RouteTooShortError';  
   this.message = (message) ? message : "Route isn't long enough for a flight";  
-};
-
-FlyingDirections.translateAirport = function(locale) {
-  if(/^[A-Za-z]{3}$/.test(locale))
-    return locale + ' Airport';
-  else
-    return locale;
 };
 
 FlyingDirections.events = new DirectionsEvents;
@@ -1118,6 +1111,13 @@ var Directions = module.exports = function(origin, destination, mode) {
   this.origin = origin;
   this.destination = destination;
   this.mode = mode;
+};
+
+Directions.translateAirport = function(locale) {
+  if(/^[A-Za-z]{3}$/.test(locale))
+    return locale + ' Airport';
+  else
+    return locale;
 };
 
 Directions.events = new DirectionsEvents();
