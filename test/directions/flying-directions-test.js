@@ -19,9 +19,26 @@ sinon.stub(badDirections.geocoder, 'geocode').
          directionsBehavior.geocodedDestination);
 
 vows.describe('FlyingDirections').addBatch({
+  'initializer': {
+    'converts IATA airport codes to "XXX Airport"': function() {
+      var directions = new FlyingDirections('ORD', 'Dallas, TX');
+      assert.equal(directions.origin, 'ORD Airport');
+      assert.equal(directions.destination, 'Dallas, TX');
+    }
+  },
+
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
   '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
+
+  '.translateAirport': {
+    'converts a 3-letter IATA airport code into "XXX Airport"': function() {
+      assert.equal(FlyingDirections.translateAirport('ORD'), 'ORD Airport');
+    },
+    'does not change a non-airport code': function() {
+      assert.equal(FlyingDirections.translateAirport('GORD'), 'GORD');
+    }
+  },
 
   '.events': {
     '.onGeocodeFinish': {
