@@ -107,27 +107,30 @@ vows.describe('HopStopDirections').addBatch({
     }
   },
 
+  '#fetchHopStop': sinon.testCase({
+    'sends a request to HopStop API': function() {
+      var hopstop = sinon.spy(HootrootApi, 'hopstop');
+
+      directions.params = function() { 
+        return {
+          x1: 1, y1: 1, x2: 1, y2: 1,
+          mode: 'PUBLICTRANSIT', when: 'now'
+        };
+      };
+      directions.fetchHopStop(sinon.stub());
+
+      assert.deepEqual(hopstop.getCall(0).args[0], {
+        x1: 1, y1: 1, x2: 1, y2: 1,
+        mode: 'PUBLICTRANSIT', when: 'now'
+      });
+
+      HootrootApi.hopstop.restore();
+    }
+  }),
+
   '#distanceEstimate': {
     'returns a total distance': function() {
       // TODO
     }
   },
-
-  '.events': sinon.testCase({
-    '.fetchHopStop': {
-      'sends a request to HopStop API': function() {
-        var hopstop = sinon.spy(HootrootApi, 'hopstop');
-
-        var evt = HopStopDirections.events.fetchHopStop(goodDirections);
-        evt(sinon.stub());
-
-        assert.deepEqual(hopstop.getCall(0).args[0], {
-          x1: 1, y1: 1, x2: 1, y2: 1,
-          mode: 'PUBLICTRANSIT', when: 'now'
-        });
-
-        HootrootApi.hopstop.restore();
-      }
-    },
-  })
 }).export(module, { error: false });
