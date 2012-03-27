@@ -129,20 +129,5 @@ vows.describe('HopStopDirections').addBatch({
         HootrootApi.hopstop.restore();
       }
     },
-
-    //'.railCallbackFallback': {
-      //topic: HopStopDirections.events.railFallbackCallback(sinon.stub()),
-
-      //'defaults to straight line distance if no route is found': function(rcf) {
-        //sinon.stub(Cm1Route, 'shouldDefaultTransitToDirectRoute').returns(true);
-
-        //var err = 
-        //rcf(err, {});
-
-        //assert.equal(data.directions.length, 1);
-
-        //Cm1Route.shouldDefaultTransitToDirectRoute.restore();
-      //}
-    //}
   })
 }).export(module, { error: false });
