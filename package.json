@@ -8,7 +8,7 @@
   "engine": "*",
   "dependencies": {
     "async": "*",
-    "CM1": "0.6.x"
+    "CM1": "*"
   },
   "devDependencies": {
     "coffee-script": "*",
