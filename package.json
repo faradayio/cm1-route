@@ -4,18 +4,18 @@
   "author": "Derek Kastner <dkastner@gmail.com>",
   "description": "Routing API based on HootRoot",
   "homepage": "http://github.com/brighterplanet/cm1-route",
-  "main": "lib/cm1-route.js",
   "engine": "*",
   "dependencies": {
     "async": "*",
-    "CM1": "*"
+    "CM1": "*",
+    "json": "*",
+    "underscore": "*"
   },
   "devDependencies": {
     "coffee-script": "*",
-    "dkastner-browserify": "1.5.1",
-    "dkastner-http-browserify": "*",
-    "fakeweb": "*",
-    "jsdom": "*",
+    "browserify": "*",
+    "http-browserify": "*",
+    "replay": "*",
     "sinon": "*",
     "vows": "*"
   },
