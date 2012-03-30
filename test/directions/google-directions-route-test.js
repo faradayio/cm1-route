@@ -9,16 +9,6 @@ var HopStopResult = require('../fixtures/hop-stop-result');
 var GoogleDirectionsRoute = lib.require('./directions/google-directions-route');
 
 vows.describe('GoogleDirectionsRoute').addBatch({
-  'creates a google.maps.DirectionsRoute-like object from Hopstop directions': function() {
-    var route = new GoogleDirectionsRoute(HopStopResult.realSubway);
-    assert.instanceOf(route.bounds, google.maps.LatLngBounds);
-    assert.include(route.copyrights, 'HopStop');
-    assert.equal(route.overview_path.length, 4);
-    assert.equal(route.legs.length, 1);
-    assert.equal(route.legs[0].steps.length, 5);
-    assert.equal(route.warnings.length, 0);
-  },
-
   '.generateOverviewPath': {
     'converts steps into an array of LatLngs': function() {
       var path = GoogleDirectionsRoute.generateOverviewPath(HopStopResult.realSubway.steps);

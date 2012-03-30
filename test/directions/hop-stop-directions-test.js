@@ -132,4 +132,16 @@ vows.describe('HopStopDirections').addBatch({
       HootrootApi.hopstop.restore();
     }
   }),
+
+  '.translateRoute': {
+    'creates a google.maps.DirectionsRoute-like object from Hopstop directions': function() {
+      var route = HopStopDirections.translateRoute(HopStopResult.realSubway).routes[0];
+      assert.instanceOf(route.bounds, google.maps.LatLngBounds);
+      assert.include(route.copyrights, 'HopStop');
+      assert.equal(route.overview_path.length, 4);
+      assert.equal(route.legs.length, 1);
+      assert.equal(route.legs[0].steps.length, 5);
+      assert.equal(route.warnings.length, 0);
+    }
+  }
 }).export(module, { error: false });
