@@ -6,7 +6,9 @@ var helper = require('./helper'),
 var Cm1Result = require('./fixtures/cm1-result'),
     GoogleResult = require('./fixtures/google-result');
 
-var Directions = helper.lib.require('./directions');
+var Directions = helper.lib.require('./directions'),
+    SubwayingSegment = helper.lib.require('./segment/subwaying-segment');
+    WalkingSegment = helper.lib.require('./segment/walking-segment');
 
 var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
 directions.calculateDistance = sinon.stub();
@@ -66,5 +68,28 @@ vows.describe('Directions').addBatch({
       directions.segments = [];
       assert.equal(directions.totalTime(), '');
     }
-  }
+  },
+
+  '#isAllWalkingSegments': {
+    'returns true if all segments are walking segments': function() {
+      directions.segments = [
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {})
+      ];
+
+      assert.isTrue(directions.isAllWalkingSegments());
+    },
+    'returns false if at least one segment is not a walking segment': function() {
+      directions.segments = [
+        new WalkingSegment(0, {}),
+        new WalkingSegment(0, {}),
+        new SubwayingSegment(0, {}),
+        new WalkingSegment(0, {})
+      ];
+
+      assert.isFalse(directions.isAllWalkingSegments());
+    }
+  },
 }).export(module, { error: false });
