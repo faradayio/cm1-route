@@ -67,29 +67,6 @@ vows.describe('HopStopDirections').addBatch({
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
   '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
 
-  '#isAllWalkingSegments': {
-    'returns true if all segments are walking segments': function() {
-      directions.segments = [
-        new WalkingSegment(0, {}),
-        new WalkingSegment(0, {}),
-        new WalkingSegment(0, {}),
-        new WalkingSegment(0, {})
-      ];
-
-      assert.isTrue(directions.isAllWalkingSegments());
-    },
-    'returns false if at least one segment is not a walking segment': function() {
-      directions.segments = [
-        new WalkingSegment(0, {}),
-        new WalkingSegment(0, {}),
-        new SubwayingSegment(0, {}),
-        new WalkingSegment(0, {})
-      ];
-
-      assert.isFalse(directions.isAllWalkingSegments());
-    }
-  },
-
   '.shouldDefaultTransitToDirectRoute': {
     'returns true for an AllWalkingSegmentsError and TRANSIT_DIRECT_DEFAULT env is true': function() {
       process.env.TRANSIT_DIRECT_DEFAULT = true;
@@ -142,6 +119,38 @@ vows.describe('HopStopDirections').addBatch({
       assert.equal(route.legs.length, 1);
       assert.equal(route.legs[0].steps.length, 5);
       assert.equal(route.warnings.length, 0);
+    }
+  },
+
+  '.generateOverviewPath': {
+    'converts steps into an array of LatLngs': function() {
+      var path = HopStopDirections.generateOverviewPath(HopStopResult.realSubway.steps);
+      assert.approximately(path[0].lat(), 40.6819, 0.000001);
+      assert.approximately(path[0].lng(), -73.90871, 0.000001);
+      assert.approximately(path[1].lat(), 40.68265, 0.000001);
+      assert.approximately(path[1].lng(), -73.91002, 0.000001);
+      assert.approximately(path[2].lat(), 40.74577, 0.000001);
+      assert.approximately(path[2].lng(), -73.98222, 0.000001);
+      assert.approximately(path[3].lat(), 40.746824, 0.000001);
+      assert.approximately(path[3].lng(), -73.983644, 0.000001);
+    }
+  },
+
+  '.generateSteps': {
+    'returns an array of DirectionSteps': function() {
+      var steps = HopStopDirections.generateGoogleSteps(HopStopResult.realSubway.steps);
+      assert.equal(steps.length, 5);
+      assert.equal(steps[0].duration.value, 32400);
+      assert.approximately(steps[0].start_location.lat(), 40.6819, 0.0001);
+      assert.approximately(steps[0].start_location.lng(), -73.90871, 0.00001);
+      assert.approximately(steps[0].end_location.lat(), 40.68265, 0.00001);
+      assert.approximately(steps[0].end_location.lng(), -73.91002, 0.00001);
+      assert.include(steps[0].instructions, 'Start out');
+      assert.include(steps[0].travel_mode, 'WALKING');
+      assert.approximately(steps[0].path[0].lat(), 40.6819, 0.0001);
+      assert.approximately(steps[0].path[0].lng(), -73.90871, 0.00001);
+      assert.approximately(steps[0].path[1].lat(), 40.68265, 0.00001);
+      assert.approximately(steps[0].path[1].lng(), -73.91002, 0.00001);
     }
   }
 }).export(module, { error: false });

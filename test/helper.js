@@ -12,8 +12,8 @@ module.exports.assert.approximately = function(test, base, deviation) {
 
   var lowerBound = base - deviation
   var upperBound = base + deviation
-  assert.isTrue(test >= lowerBound, 'Expected ' + test + ' to be approximately ' + base + ', within ' + deviation);
-  assert.isTrue(test <= upperBound, 'Expected ' + test + ' to be approximately ' + base + ', within ' + deviation);
+  module.exports.assert.isTrue(test >= lowerBound, 'Expected ' + test + ' to be approximately ' + base + ', within ' + deviation);
+  module.exports.assert.isTrue(test <= upperBound, 'Expected ' + test + ' to be approximately ' + base + ', within ' + deviation);
 };
 
 var LatLng = function(lat, lon) {
