@@ -2,6 +2,9 @@ browserify = require 'dkastner-browserify'
 child = require 'child_process'
 fs = require 'fs'
 
+task 'clean', 'Clean up built files', ->
+  fs.unlink('cm1-route.js');
+
 task 'bake', 'Build client-side cm1-route.js using browserify', ->
   console.log "Browserifying..."
   b = browserify {
