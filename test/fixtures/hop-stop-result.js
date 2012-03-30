@@ -18,22 +18,18 @@ var HopStopResult = module.exports ={
         }
       },
       { travel_mode: 'SUBWAYING',
-        distance: { value: 1479 },
         duration: { value: 200 },
         instructions: 'Take the J train from Chauncey St station heading to Broad St'
       },
       { travel_mode: 'WALKING',
-        distance: { value: 240 },
         duration: { value: 5 },
         instructions: 'Exit near intersection of Canal St and Lafayette St'
       },
       { travel_mode: 'SUBWAYING',
-        distance: { value: 948 },
         duration: { value: 18 },
         instructions: 'Take the 6 train from Canal Street station heading Uptown / to Pelham Bay Park'
       },
       { travel_mode: 'WALKING',
-        distance: { value: 154 },
         duration: { value: 18 },
         instructions: 'Exit near intersection of E 32nd St and Park Ave',
         start_location: {
@@ -111,12 +107,10 @@ var HopStopResult = module.exports ={
         }
       },
       { travel_mode: 'WALKING',
-        distance: { value: 240 },
         duration: { value: 18 },
         instructions: 'Exit near intersection of Canal St and Lafayette St'
       },
       { travel_mode: 'WALKING',
-        distance: { value: 154 },
         duration: { value: 10 },
         instructions: 'Exit near intersection of E 32nd St and Park Ave',
         start_location: {
