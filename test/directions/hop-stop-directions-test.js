@@ -127,10 +127,4 @@ vows.describe('HopStopDirections').addBatch({
       HootrootApi.hopstop.restore();
     }
   }),
-
-  '#distanceEstimate': {
-    'returns a total distance': function() {
-      // TODO
-    }
-  },
 }).export(module, { error: false });
