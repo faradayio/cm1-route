@@ -1,26 +1,13 @@
-global.vows = require('vows');
-global.assert = require('assert');
-global.sinon = require('sinon');
+module.exports = {
+  vows: require('vows'),
+  assert: require('assert'),
+  sinon: require('sinon'),
+  lib: require('../'),
 
-var jsdom = require('jsdom');
-
-var Cm1Result = require('./fixtures/cm1-result');
-
-global.setHtmlFixtures = function(html) {
-  html = '<html><head></head><body>' + html + '</body></html>';
-  window = jsdom.jsdom(html).createWindow();
-  global.window = window;
-  global.document = window.document;
-}
-
-global.navigator = {
-  userAgent: 'jasmine'
+  Cm1Result: function() { return require('./fixtures/cm1-result'); }
 };
-global.location = { href: "http://monitoring" };
-setHtmlFixtures();
-global.document.location = global.location;
 
-assert.approximately = function(test, base, deviation) {
+module.exports.assert.approximately = function(test, base, deviation) {
   if(!deviation) deviation = 0;
 
   var lowerBound = base - deviation

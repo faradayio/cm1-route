@@ -1,5 +1,9 @@
-var Directions = require('../lib/directions'),
-    Segment = require('../lib/segment');
+var helper = require('./helper'),
+    assert = helper.assert,
+    lib = helper.lib;
+
+var Directions = lib.require('./directions'),
+    Segment = lib.require('./segment');
 
 module.exports = {
   providesRoute: function(goodDirections, badDirections, extraVows) {

@@ -1,9 +1,14 @@
-require('../helper');
+var helper = require('../helper'),
+    lib = helper.lib
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var GoogleResult = require('../fixtures/google-result');
 var directionsBehavior = require('../directions-behavior');
 
-var DirectionsEvents = require('../../lib/directions-events'),
-    DirectRailDirections = require('../../lib/directions/direct-rail-directions');
+var DirectionsEvents = lib.require('./directions-events'),
+    DirectRailDirections = lib.require('./directions/direct-rail-directions');
 
 var directions = new DirectRailDirections('A','B');
 

@@ -1,16 +1,21 @@
-require('../helper');
+var helper = require('../helper'),
+    lib = helper.lib
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var async = require('async');
 
 var GoogleResult = require('../fixtures/google-result'),
     HopStopResult = require('../fixtures/hop-stop-result');
 var directionsBehavior = require('../directions-behavior');
 
-var Directions = require('../../lib/directions'),
-    GoogleDirectionsRoute = require('../../lib/directions/google-directions-route'),
-    HootrootApi = require('../../lib/hootroot-api'),
-    HopStopDirections = require('../../lib/directions/hop-stop-directions')
-    SubwayingSegment = require('../../lib/segment/subwaying-segment'),
-    WalkingSegment = require('../../lib/segment/walking-segment');
+var Directions = lib.require('./directions'),
+    GoogleDirectionsRoute = lib.require('./directions/google-directions-route'),
+    HootrootApi = lib.require('./hootroot-api'),
+    HopStopDirections = lib.require('./directions/hop-stop-directions')
+    SubwayingSegment = lib.require('./segment/subwaying-segment'),
+    WalkingSegment = lib.require('./segment/walking-segment');
 
 var directions = new HopStopDirections('A','B','WALKING','now');
 

@@ -1,6 +1,8 @@
-require('./helper');
+var helper = require('./helper'),
+    assert = helper.assert,
+    vows = helper.vows;
 
-var DirectionsEvents = require('../lib/directions-events');
+var DirectionsEvents = helper.lib.require('../lib/directions-events');
 
 var events = new DirectionsEvents();
 var goodDirections = {

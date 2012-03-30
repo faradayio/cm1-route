@@ -1,5 +1,8 @@
-require('./helper');
-var TimeFormatter = require('../lib/time-formatter');
+var helper = require('./helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
+var TimeFormatter = helper.lib.require('./time-formatter');
 
 vows.describe('TimeFormatter').addBatch({
   '.format': {

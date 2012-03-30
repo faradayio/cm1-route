@@ -1,8 +1,12 @@
-require('./helper');
+var helper = require('./helper'),
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var Cm1Result = require('./fixtures/cm1-result'),
     GoogleResult = require('./fixtures/google-result');
 
-var Directions = require('../lib/directions');
+var Directions = helper.lib.require('./directions');
 
 var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
 directions.calculateDistance = sinon.stub();

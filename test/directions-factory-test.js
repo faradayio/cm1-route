@@ -1,7 +1,11 @@
-require('./helper');
-var DirectionsFactory = require('../lib/directions-factory'),
-    GoogleDirections = require('../lib/directions/google-directions'),
-    HopStopDirections = require('../lib/directions/google-directions');
+var helper = require('./helper'),
+    lib = helper.lib,
+    vows = helper.vows,
+    assert = helper.assert;
+
+var DirectionsFactory = lib.require('./directions-factory'),
+    GoogleDirections = lib.require('./directions/google-directions'),
+    HopStopDirections = lib.require('./directions/google-directions');
 
 vows.describe('DirectionsFactory').addBatch({
   '.create': {

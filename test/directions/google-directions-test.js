@@ -1,8 +1,13 @@
-require('../helper');
+var helper = require('../helper'),
+    lib = helper.lib
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var GoogleResult = require('../fixtures/google-result'),
     directionsBehavior = require('../directions-behavior');
 
-var GoogleDirections = require('../../lib/directions/google-directions');
+var GoogleDirections = lib.require('./directions/google-directions');
 
 var directions = new GoogleDirections('A','B','WALKING');
 
@@ -27,10 +32,4 @@ vows.describe('GoogleDirections').addBatch({
   '#route': directionsBehavior.providesRoute(goodDirections, badDirections),
   '#storeRoute': directionsBehavior.proviesStoreRoute(goodDirections),
   '#calculateDistance': directionsBehavior.proviesCalculateDistance(goodDirections),
-
-  '#distanceEstimate': {
-    'returns a total distance': function() {
-      // TODO
-    }
-  }
 }).export(module, { error: false });

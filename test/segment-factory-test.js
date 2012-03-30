@@ -1,10 +1,14 @@
-require('./helper');
-var SegmentFactory = require('../lib/segment-factory');
-var BicyclingSegment = require('../lib/segment/bicycling-segment'),
-    BussingSegment = require('../lib/segment/bussing-segment'),
-    DrivingSegment = require('../lib/segment/driving-segment'),
-    SubwayingSegment = require('../lib/segment/subwaying-segment'),
-    WalkingSegment = require('../lib/segment/walking-segment');
+var helper = require('./helper'),
+    lib = helper.lib,
+    vows = helper.vows,
+    assert = helper.assert;
+
+var SegmentFactory = lib.require('./segment-factory');
+var BicyclingSegment = lib.require('./segment/bicycling-segment'),
+    BussingSegment = lib.require('./segment/bussing-segment'),
+    DrivingSegment = lib.require('./segment/driving-segment'),
+    SubwayingSegment = lib.require('./segment/subwaying-segment'),
+    WalkingSegment = lib.require('./segment/walking-segment');
 
 vows.describe('SegmentFactory').addBatch({
   '.create': {

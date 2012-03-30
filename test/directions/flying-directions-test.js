@@ -1,9 +1,14 @@
-require('../helper');
+var helper = require('../helper'),
+    lib = helper.lib
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var GoogleResult = require('../fixtures/google-result');
 var directionsBehavior = require('../directions-behavior');
 
-var DirectionsEvents = require('../../lib/directions-events'),
-    FlyingDirections = require('../../lib/directions/flying-directions');
+var DirectionsEvents = lib.require('./directions-events'),
+    FlyingDirections = lib.require('./directions/flying-directions');
 
 var directions = new FlyingDirections('A','B');
 

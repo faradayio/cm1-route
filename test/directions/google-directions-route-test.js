@@ -1,7 +1,12 @@
-require('../helper');
+var helper = require('../helper'),
+    lib = helper.lib
+    vows = helper.vows,
+    assert = helper.assert,
+    sinon = helper.sinon;
+
 var HopStopResult = require('../fixtures/hop-stop-result');
 
-var GoogleDirectionsRoute = require('../../lib/directions/google-directions-route');
+var GoogleDirectionsRoute = lib.require('./directions/google-directions-route');
 
 vows.describe('GoogleDirectionsRoute').addBatch({
   'creates a google.maps.DirectionsRoute-like object from Hopstop directions': function() {
