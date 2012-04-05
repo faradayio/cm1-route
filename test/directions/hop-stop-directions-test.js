@@ -73,11 +73,16 @@ vows.describe('HopStopDirections').addBatch({
       var err = new HopStopDirections.AllWalkingSegmentsError('FAIL');
       assert.isTrue(HopStopDirections.shouldDefaultTransitToDirectRoute(err));
     },
+    'returns true for an HopStopError and TRANSIT_DIRECT_DEFAULT env is true': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new HootrootApi.HopStopError('FAIL');
+      assert.isTrue(HopStopDirections.shouldDefaultTransitToDirectRoute(err));
+    },
     'returns false for null err': function() {
       process.env.TRANSIT_DIRECT_DEFAULT = true;
       assert.isFalse(HopStopDirections.shouldDefaultTransitToDirectRoute(null));
     },
-    'returns false for non-AllWalkingSegmentsError': function() {
+    'returns false for non-AllWalkingSegmentsError and non-HopStopError': function() {
       process.env.TRANSIT_DIRECT_DEFAULT = true;
       var err = new Error('LULZ');
       assert.isFalse(HopStopDirections.shouldDefaultTransitToDirectRoute(null));
