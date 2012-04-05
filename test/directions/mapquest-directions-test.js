@@ -24,13 +24,14 @@ vows.describe('MapquestDirections').addBatch({
       assert.isObject(translation.routes[0]);
       assert.isArray( translation.routes[0].legs);
       assert(         translation.routes[0].legs[0].distance.value > 0);
-      //assert.equal(   translation.routes[0].legs[0].start_address, '1916 Broadway, New York, NY')
-      //assert.equal(   translation.routes[0].legs[0].end_address, '162 Madison Ave, New York, NY')
       assert.isArray( translation.routes[0].legs[0].steps);
       assert.isObject(translation.routes[0].legs[0].steps[0]);
       assert.equal(   translation.routes[0].legs[0].steps[0].travel_mode, 'WALKING');
       assert.equal(   translation.routes[0].legs[0].steps[0].distance.value, 98.169984);
       assert.equal(   translation.routes[0].legs[0].steps[0].instructions, 'Start out going north on Broadway toward W 64th St.');
+      assert.equal(   translation.routes[0].legs[0].steps[0].path.length, 2);
+      assert.equal(   translation.routes[0].legs[0].steps[1].path.length, 1);
+      assert.equal(   translation.routes[0].legs[0].steps[3].path.length, 23);
     }
   },
 
