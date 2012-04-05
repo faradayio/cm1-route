@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var BicyclingSegment = require('../../lib/segment/bicycling-segment');
 
 var bicycling = new BicyclingSegment(0, {
@@ -12,8 +15,6 @@ vows.describe('BicyclingSegment').addBatch({
   },
 
   '#getImpacts': {
-    topic: bicycling,
-
     'passes an emissions parameter': function() {
       var emissions;
       bicycling.getImpacts(function(err, impacts) {

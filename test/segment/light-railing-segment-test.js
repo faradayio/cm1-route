@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var LightRailingSegment = require('../../lib/segment/light-railing-segment');
 
 vows.describe('LightRailingSegment').addBatch({

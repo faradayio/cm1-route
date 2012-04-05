@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var DrivingSegment = require('../../lib/segment/driving-segment');
 
 var fakeweb = require('fakeweb'),

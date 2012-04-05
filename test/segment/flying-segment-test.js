@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var FlyingSegment = require('../../lib/segment/flying-segment');
 
 vows.describe('FlyingSegment').addBatch({

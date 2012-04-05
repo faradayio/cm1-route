@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var CommuterRailingSegment = require('../../lib/segment/commuter-railing-segment');
 
 vows.describe('CommuterRailingSegment').addBatch({

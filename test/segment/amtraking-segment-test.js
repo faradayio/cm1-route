@@ -1,5 +1,8 @@
-require('../helper');
-var AmtrakingSegment = require('../../lib/segment/amtraking-segment');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
+var AmtrakingSegment = helper.lib.require('./segment/amtraking-segment');
 
 vows.describe('AmtrakingSegment').addBatch({
   'converts distance to kilometers': function() {

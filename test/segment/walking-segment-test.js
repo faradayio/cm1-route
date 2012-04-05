@@ -1,4 +1,7 @@
-require('../helper');
+var helper = require('../helper'),
+    vows = helper.vows,
+    assert = helper.assert;
+
 var WalkingSegment = require('../../lib/segment/walking-segment');
 
 vows.describe('WalkingSegment').addBatch({
