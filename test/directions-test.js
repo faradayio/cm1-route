@@ -14,14 +14,6 @@ var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
 directions.calculateDistance = sinon.stub();
 directions.storeRoute(GoogleResult.driving);
 
-var fakeweb = require('fakeweb'),
-    http = require('http');
-http.register_intercept({
-    uri: '/automobile_trips.json', 
-    host: 'impact.brighterplanet.com',
-    body: JSON.stringify(Cm1Result.fit)
-});
-
 vows.describe('Directions').addBatch({
   '#getEmissions': {
     topic: function() {
