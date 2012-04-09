@@ -14,7 +14,7 @@
   "devDependencies": {
     "coffee-script": "*",
     "browserify": "*",
-    "http-browserify": "*",
+    "http-browserify": "git://github.com/dkastner/http-browserify.git",
     "replay": "*",
     "sinon": "*",
     "vows": "*"

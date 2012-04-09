@@ -7,27 +7,27 @@ var require = function (file, cwd) {
     var res = mod._cached ? mod._cached : mod();
     return res;
 }
-var __require = require;
 
 require.paths = [];
 require.modules = {};
 require.extensions = [".js",".coffee"];
 
+require._core = {
+    'assert': true,
+    'events': true,
+    'fs': true,
+    'path': true,
+    'vm': true
+};
+
 require.resolve = (function () {
-    var core = {
-        'assert': true,
-        'events': true,
-        'fs': true,
-        'path': true,
-        'vm': true
-    };
-    
     return function (x, cwd) {
         if (!cwd) cwd = '/';
         
-        if (core[x]) return x;
+        if (require._core[x]) return x;
         var path = require.modules.path();
-        var y = cwd || '.';
+        cwd = path.resolve('/', cwd);
+        var y = cwd || '/';
         
         if (x.match(/^(?:\.\.?\/|\/)/)) {
             var m = loadAsFileSync(path.resolve(y, x))
@@ -116,7 +116,11 @@ require.alias = function (from, to) {
     }
     var basedir = path.dirname(res);
     
-    var keys = Object_keys(require.modules);
+    var keys = (Object.keys || function (obj) {
+        var res = [];
+        for (var key in obj) res.push(key)
+        return res;
+    })(require.modules);
     
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
@@ -130,17 +134,65 @@ require.alias = function (from, to) {
     }
 };
 
-var Object_keys = Object.keys || function (obj) {
-    var res = [];
-    for (var key in obj) res.push(key)
-    return res;
+require.define = function (filename, fn) {
+    var dirname = require._core[filename]
+        ? ''
+        : require.modules.path().dirname(filename)
+    ;
+    
+    var require_ = function (file) {
+        return require(file, dirname)
+    };
+    require_.resolve = function (name) {
+        return require.resolve(name, dirname);
+    };
+    require_.modules = require.modules;
+    require_.define = require.define;
+    var module_ = { exports : {} };
+    
+    require.modules[filename] = function () {
+        require.modules[filename]._cached = module_.exports;
+        fn.call(
+            module_.exports,
+            require_,
+            module_,
+            module_.exports,
+            dirname,
+            filename
+        );
+        require.modules[filename]._cached = module_.exports;
+        return module_.exports;
+    };
 };
 
 if (typeof process === 'undefined') process = {};
 
-if (!process.nextTick) process.nextTick = function (fn) {
-    setTimeout(fn, 0);
-};
+if (!process.nextTick) process.nextTick = (function () {
+    var queue = [];
+    var canPost = typeof window !== 'undefined'
+        && window.postMessage && window.addEventListener
+    ;
+    
+    if (canPost) {
+        window.addEventListener('message', function (ev) {
+            if (ev.source === window && ev.data === 'browserify-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+    }
+    
+    return function (fn) {
+        if (canPost) {
+            queue.push(fn);
+            window.postMessage('browserify-tick', '*');
+        }
+        else setTimeout(fn, 0);
+    };
+})();
 
 if (!process.title) process.title = 'browser';
 
@@ -151,25 +203,11 @@ if (!process.binding) process.binding = function (name) {
 
 if (!process.cwd) process.cwd = function () { return '.' };
 
-require.modules["path"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = ".";
-    var __filename = "path";
-    
-    var require = function (file) {
-        return __require(file, ".");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, ".");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["path"]._cached = module.exports;
-    
-    (function () {
-        function filter (xs, fn) {
+if (!process.env) process.env = {};
+if (!process.argv) process.argv = [];
+
+require.define("path", function (require, module, exports, __dirname, __filename) {
+function filter (xs, fn) {
     var res = [];
     for (var i = 0; i < xs.length; i++) {
         if (fn(xs[i], i, xs)) res.push(xs[i]);
@@ -303,66 +341,26 @@ exports.basename = function(path, ext) {
 exports.extname = function(path) {
   return splitPathRe.exec(path)[3] || '';
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["path"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/dkastner-http-browserify/package.json"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/dkastner-http-browserify";
-    var __filename = "/node_modules/dkastner-http-browserify/package.json";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/dkastner-http-browserify");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/dkastner-http-browserify");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/dkastner-http-browserify/package.json"]._cached = module.exports;
-    
-    (function () {
-        module.exports = {"name":"dkastner-http-browserify","version":"0.0.4","description":"http module compatability for browserify","main":"index.js","browserify":"browser.js","directories":{"lib":".","example":"example","test":"test"},"devDependencies":{"express":"2.4.x","browserify":"1.4.x","sinon":"*","vows":"*"},"repository":{"type":"git","url":"http://github.com/substack/http-browserify.git"},"keywords":["http","browserify","compatible","meatless","browser"],"author":{"name":"James Halliday","email":"mail@substack.net","url":"http://substack.net"},"contributors":[{"name":"Derek Kastner","email":"dkastner@gmail.com"}],"license":"MIT/X11","engine":{"node":">=0.4"}};
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/dkastner-http-browserify/package.json"]._cached = module.exports;
-    return module.exports;
-};
+});
 
-require.modules["/node_modules/dkastner-http-browserify/browser.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/dkastner-http-browserify";
-    var __filename = "/node_modules/dkastner-http-browserify/browser.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/dkastner-http-browserify");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/dkastner-http-browserify");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/dkastner-http-browserify/browser.js"]._cached = module.exports;
-    
-    (function () {
-        var http = module.exports;
+require.define("/node_modules/http-browserify/package.json", function (require, module, exports, __dirname, __filename) {
+module.exports = {"main":"index.js","browserify":"index.js"}
+});
+
+require.define("/node_modules/http-browserify/index.js", function (require, module, exports, __dirname, __filename) {
+var http = module.exports;
 var EventEmitter = require('events').EventEmitter;
 var Request = require('./lib/request');
 
-if (typeof window === 'undefined') {
-    throw new Error('no window object present');
-}
-
 http.request = function (params, cb) {
-    var req = Request.create(params);
+    var host = window.location.host.split(':')[0];
+    if (!params) params = {};
+    if (!params.host) params.host = host;
+    if (!params.port) params.port = window.location.port;
+    
+    var xhrClass = xhrHttp(host, params);
+    var req = new Request(new xhrClass(), params);
     if (cb) req.on('response', cb);
     return req;
 };
@@ -373,38 +371,59 @@ http.get = function (params, cb) {
     req.end();
     return req;
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/dkastner-http-browserify/browser.js"]._cached = module.exports;
-    return module.exports;
+
+http.Agent = function () {};
+http.Agent.defaultMaxSockets = 4;
+
+var xhrHttp = function (host, params) {
+    if (typeof window === 'undefined') {
+        throw new Error('no window object present');
+    }
+    else if (params.host != host && window.XDomainRequest) {
+        return window.XDomainRequest;
+    }
+    else if (window.XMLHttpRequest) {
+        return window.XMLHttpRequest;
+    }
+    else if (window.ActiveXObject) {
+        var axs = [
+            'Msxml2.XMLHTTP.6.0',
+            'Msxml2.XMLHTTP.3.0',
+            'Microsoft.XMLHTTP'
+        ];
+        for (var i = 0; i < axs.length; i++) {
+            try {
+                var ax = new(window.ActiveXObject)(axs[i]);
+                return function () {
+                    if (ax) {
+                        var ax_ = ax;
+                        ax = null;
+                        return ax_;
+                    }
+                    else {
+                        return new(window.ActiveXObject)(axs[i]);
+                    }
+                };
+            }
+            catch (e) {}
+        }
+        throw new Error('ajax not supported in this browser')
+    }
+    else {
+        throw new Error('ajax not supported in this browser');
+    }
 };
 
-require.modules["events"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = ".";
-    var __filename = "events";
-    
-    var require = function (file) {
-        return __require(file, ".");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, ".");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["events"]._cached = module.exports;
-    
-    (function () {
-        if (!process.EventEmitter) process.EventEmitter = function () {};
+});
+
+require.define("events", function (require, module, exports, __dirname, __filename) {
+if (!process.EventEmitter) process.EventEmitter = function () {};
 
 var EventEmitter = exports.EventEmitter = process.EventEmitter;
 var isArray = typeof Array.isArray === 'function'
     ? Array.isArray
     : function (xs) {
-        return Object.toString.call(xs) === '[object Array]'
+        return Object.prototype.toString.call(xs) === '[object Array]'
     }
 ;
 
@@ -569,65 +588,74 @@ EventEmitter.prototype.listeners = function(type) {
   }
   return this._events[type];
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["events"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/dkastner-http-browserify/lib/request.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/dkastner-http-browserify/lib";
-    var __filename = "/node_modules/dkastner-http-browserify/lib/request.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/dkastner-http-browserify/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/dkastner-http-browserify/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/dkastner-http-browserify/lib/request.js"]._cached = module.exports;
-    
-    (function () {
-        var EventEmitter = require('events').EventEmitter;
+});
+
+require.define("/node_modules/http-browserify/lib/request.js", function (require, module, exports, __dirname, __filename) {
+var EventEmitter = require('events').EventEmitter;
 var Response = require('./response');
 
-var Request = module.exports = function() {};
+var Request = module.exports = function (xhr, params) {
+    var self = this;
+    self.xhr = xhr;
+    self.body = '';
+    
+    var uri = params.host + ':' + params.port + (params.path || '/');
+    
+    xhr.open(
+        params.method || 'GET',
+        (params.scheme || 'http') + '://' + uri,
+        true
+    );
+    
+    if (params.headers && xhr.setRequestHeader) {
+        for(key in params.headers) {
+            if (Request.isSafeRequestHeader(key)) {
+                var value = params.headers[key];
+                if (value instanceof Array) {
+                    for(var i = 0, j = value.length; i < j; i++) {
+                        xhr.setRequestHeader(key, value[i]);
+                    }
+                }
+                else xhr.setRequestHeader(key, value)
+            }
+        }
+    }
+    
+    var res = new Response;
+    res.on('ready', function () {
+        self.emit('response', res);
+    });
+    
+
+    xhr.onprogress = function() {  // IE XDR
+        xhr.readyState = 2;
+        res.getAllResponseHeaders = function() {
+          return 'Content-Type: ' + xhr.contentType;  // This is the only header available
+        };
+        res.handle(xhr);
+    }
+    xhr.onreadystatechange = function () {
+        res.handle(xhr);
+    };
+    xhr.onload = function() {  // IE XDR
+        xhr.readyState = 4;
+        res.handle(xhr);
+    };
+    xhr.onerror = function() {  // IE XDR
+        xhr.readyState = 3;
+        xhr.error = 'Unknown error';
+        res.handle(xhr);
+    };
+};
 
 Request.prototype = new EventEmitter;
 
-Request.create = function(params) {
-    if (!params) params = {};
-
-    var req;
-    if(params.host && window.XDomainRequest) { // M$ IE XDR - use when host is set and XDR present
-      req = new XdrRequest(params);
-    } else {                                   // Everybody else
-      req = new XhrRequest(params);
-    }
-    return req;
-}
-
-Request.prototype.init = function(params) {
-    if (!params.host) params.host = window.location.host.split(':')[0];
-    if (!params.port) params.port = window.location.port;
-    
-    this.body = '';
-    if(!/^\//.test(params.path)) params.path = '/' + params.path;
-    this.uri = params.host + ':' + params.port + (params.path || '/');
-    this.xhr = new this.xhrClass;
-
-    this.xhr.open(params.method || 'GET', 'http://' + this.uri, true);
-};
-
 Request.prototype.setHeader = function (key, value) {
-    if ((Array.isArray && Array.isArray(value))
-    || value instanceof Array) {
+    if (!xhr.setRequestHeader) // IE XDR
+        return;
+
+    if (value instanceof Array) {
         for (var i = 0; i < value.length; i++) {
             this.xhr.setRequestHeader(key, value[i]);
         }
@@ -646,147 +674,49 @@ Request.prototype.end = function (s) {
     this.xhr.send(this.body);
 };
 
+// Taken from http://dxr.mozilla.org/mozilla/mozilla-central/content/base/src/nsXMLHttpRequest.cpp.html
+Request.unsafeHeaders = [
+    "accept-charset",
+    "accept-encoding",
+    "access-control-request-headers",
+    "access-control-request-method",
+    "connection",
+    "content-length",
+    "cookie",
+    "cookie2",
+    "content-transfer-encoding",
+    "date",
+    "expect",
+    "host",
+    "keep-alive",
+    "origin",
+    "referer",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+    "user-agent",
+    "via"
+];
 
-// XhrRequest
-
-var XhrRequest = function(params) {
-    var self = this;
-    self.init(params);
-    var xhr = this.xhr;
-    
-    if(params.headers) {
-        Object.keys(params.headers).forEach(function (key) {
-            var value = params.headers[key];
-            if (Array.isArray(value)) {
-                value.forEach(function (v) {
-                    xhr.setRequestHeader(key, v);
-                });
-            }
-            else xhr.setRequestHeader(key, value)
-        });
-    }
-  
-    xhr.onreadystatechange = function () {
-        res.handle(xhr);
-    };
-    
-    var res = new Response;
-    res.on('ready', function () {
-        self.emit('response', res);
-    });
-};
-
-XhrRequest.prototype = new Request;
-
-XhrRequest.prototype.xhrClass = function() {
-    if (window.XMLHttpRequest) {
-        return window.XMLHttpRequest;
-    }
-    else if (window.ActiveXObject) {
-        var axs = [
-            'Msxml2.XMLHTTP.6.0',
-            'Msxml2.XMLHTTP.3.0',
-            'Microsoft.XMLHTTP'
-        ];
-        for (var i = 0; i < axs.length; i++) {
-            try {
-                var ax = new(window.ActiveXObject)(axs[i]);
-                return function () {
-                    if (ax) {
-                        var ax_ = ax;
-                        ax = null;
-                        return ax_;
-                    }
-                    else {
-                        return new(window.ActiveXObject)(axs[i]);
-                    }
-                };
-            }
-            catch (e) {}
+Request.indexOfHeader = function(headerName) {
+    for (var i = 0, j = Request.unsafeHeaders.length; i < j; i++) {
+        if (Request.unsafeHeaders[i] === headerName) {
+            return i;
         }
-        throw new Error('ajax not supported in this browser')
     }
-    else {
-        throw new Error('ajax not supported in this browser');
-    }
-}();
-
-
-
-// XdrRequest
-
-var XdrRequest = function(params) {
-    var self = this;
-    self.init(params);
-    var xhr = this.xhr;
-
-    self.headers = {};
-
-    var res = new XdrResponse();
-
-    xhr.onprogress = function() {
-        xhr.readyState = 2;
-        res.contentType = xhr.contentType; // There, that's all the headers you get
-        res.handle(xhr);
-    }
-    xhr.onerror = function() {
-        xhr.readyState = 3;
-        xhr.error = "Who the fuck knows? IE doesn't care!";
-        res.handle(xhr);
-    };
-    xhr.onload = function() {
-        xhr.readyState = 4;
-        res.handle(xhr);
-    };
-
-    res.on('ready', function () {
-        self.emit('response', res);
-    });
+    return -1;
 };
 
-XdrRequest.prototype = new Request;
-
-XdrRequest.prototype.xhrClass = window.XDomainRequest;
-
-
-
-// XdrResponse
-
-var XdrResponse = function() {
-    this.offset = 0;
+Request.isSafeRequestHeader = function (headerName) {
+    if (!headerName) return false;
+    return (Request.indexOfHeader(headerName.toLowerCase()) === -1)
 };
 
-XdrResponse.prototype = new Response();
+});
 
-XdrResponse.prototype.getAllResponseHeaders = function() {
-  return 'Content-Type: ' + this.contentType;
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/dkastner-http-browserify/lib/request.js"]._cached = module.exports;
-    return module.exports;
-};
-
-require.modules["/node_modules/dkastner-http-browserify/lib/response.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/dkastner-http-browserify/lib";
-    var __filename = "/node_modules/dkastner-http-browserify/lib/response.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/dkastner-http-browserify/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/dkastner-http-browserify/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/dkastner-http-browserify/lib/response.js"]._cached = module.exports;
-    
-    (function () {
-        var EventEmitter = require('events').EventEmitter;
+require.define("/node_modules/http-browserify/lib/response.js", function (require, module, exports, __dirname, __filename) {
+var EventEmitter = require('events').EventEmitter;
 
 var Response = module.exports = function (res) {
     this.offset = 0;
@@ -811,8 +741,7 @@ function parseHeaders (res) {
             var key = m[1].toLowerCase(), value = m[2];
             
             if (headers[key] !== undefined) {
-                if ((Array.isArray && Array.isArray(headers[key]))
-                || headers[key] instanceof Array) {
+                if (headers[key] instanceof Array) {
                     headers[key].push(value);
                 }
                 else {
@@ -885,78 +814,38 @@ Response.prototype.write = function (res) {
         this.offset = res.responseText.length;
     }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/dkastner-http-browserify/lib/response.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/cm1-route.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/cm1-route.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/cm1-route.js"]._cached = module.exports;
-    
-    (function () {
-        if(!process.env) process.env = {};
+});
 
-var DirectionsFactory = require('./directions-factory'),
-    FlyingDirections = require('./directions/flying-directions'),
-    GoogleDirections = require('./directions/google-directions'),
-    HopStopDirections = require('./directions/hop-stop-directions');
+require.define("/lib/cm1-route.js", function (require, module, exports, __dirname, __filename) {
+if(!process.env) process.env = {};
+
+var DirectionsFactory  = require('./directions-factory'),
+    FlyingDirections   = require('./directions/flying-directions'),
+    GoogleDirections   = require('./directions/google-directions'),
+    HopStopDirections  = require('./directions/hop-stop-directions'),
+    MapquestDirections = require('./directions/mapquest-directions');
 
 var Cm1Route = module.exports = {
   NumberFormatter: require('./number-formatter'),
   DirectionsFactory: DirectionsFactory,
   FlyingDirections: FlyingDirections,
   GoogleDirections: GoogleDirections,
-  HopStopDirections: HopStopDirections
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/cm1-route.js"]._cached = module.exports;
-    return module.exports;
+  HopStopDirections: HopStopDirections,
+  MapquestDirections: MapquestDirections
 };
 
-require.modules["/lib/directions-factory.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/directions-factory.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions-factory.js"]._cached = module.exports;
-    
-    (function () {
-        var FlyingDirections = require('./directions/flying-directions'),
+});
+
+require.define("/lib/directions-factory.js", function (require, module, exports, __dirname, __filename) {
+var FlyingDirections = require('./directions/flying-directions'),
     GoogleDirections = require('./directions/google-directions'),
-    HopStopDirections = require('./directions/hop-stop-directions');
+    MapquestDirections = require('./directions/mapquest-directions');
 
 var DirectionsFactory = module.exports = {
   create: function(origin, destination, mode, day, time) {
     if(mode == 'PUBLICTRANSIT' || mode == 'SUBWAYING' || mode == 'BUSSING') {
-      return new HopStopDirections(origin, destination, mode, day, time);
+      return new MapquestDirections(origin, destination, mode, day, time);
     } else if(mode == 'FLYING') {
       return new FlyingDirections(origin, destination, mode);
     } else {
@@ -965,32 +854,11 @@ var DirectionsFactory = module.exports = {
   }
 };
 
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions-factory.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions/flying-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/flying-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/flying-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions'),
+});
+
+require.define("/lib/directions/flying-directions.js", function (require, module, exports, __dirname, __filename) {
+var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
     GoogleDirectionsRoute = require('./google-directions-route'),
     NumberFormatter = require('../number-formatter'),
@@ -1062,50 +930,34 @@ FlyingDirections.events.onGeocodeFinish = function(directions, callback) {
       end_location: directions.destinationLatLng
     }];
 
-    var directionsResult = { routes: [{
+    var route = {
+      overview_path: [directions.originLatLng, directions.destinationLatLng],
       legs: [{
         duration: { value: directions.duration() },
         distance: { value: directions.distanceInMeters },
         steps: steps
       }],
       warnings: [],
-      bounds: GoogleDirectionsRoute.generateBounds(steps)
-    }]};
+    };
+    route.bounds = GoogleDirectionsRoute.generateBounds(route.overview_path);
+
+    var directionsResult = { routes: [route] };
     directions.storeRoute(directionsResult);
 
     callback(null, directions);
   };
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/flying-directions.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions.js"]._cached = module.exports;
-    
-    (function () {
-        var async = require('async');
+});
+
+require.define("/lib/directions.js", function (require, module, exports, __dirname, __filename) {
+var _ = require('underscore'),
+    async = require('async');
 
 var DirectionsEvents = require('./directions-events'),
     SegmentFactory = require('./segment-factory'),
-    TimeFormatter = require('./time-formatter');
+    TimeFormatter = require('./time-formatter'),
+    WalkingSegment = require('./segment/walking-segment');
 
 var Directions = module.exports = function(origin, destination, mode) {
   this.origin = origin;
@@ -1130,11 +982,11 @@ Directions.prototype.storeRoute = function(result) {
   this.directionsResult = result;
   this.steps = result.routes[0].legs[0].steps;
   this.segments = [];
-  for(var i = 0; i < this.steps.length; i++) {
-    var step = this.steps[i];
+  _.each(this.steps, function(step, i) {
     this.segments.push(SegmentFactory.create(i, step));
-  }
-  this.calculateDistance();
+  }, this);
+  if(this.calculateDistance)
+    this.calculateDistance();
 };
 
 Directions.prototype.eachSegment = function(lambda) {
@@ -1187,85 +1039,1037 @@ Directions.prototype.totalTime = function() {
   });
   return TimeFormatter.format(totalTime);
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions.js"]._cached = module.exports;
-    return module.exports;
+
+Directions.prototype.isAllWalkingSegments = function() {
+  var result = true;
+  this.eachSegment(function(segment) {
+    result = result && segment instanceof WalkingSegment;
+  });
+  return result;
 };
 
-require.modules["/node_modules/async/package.json"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/async";
-    var __filename = "/node_modules/async/package.json";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/async");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/async");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/async/package.json"]._cached = module.exports;
-    
-    (function () {
-        module.exports = {"name":"async","description":"Higher-order functions and common patterns for asynchronous code","main":"./index","author":"Caolan McMahon","version":"0.1.15","repository":{"type":"git","url":"http://github.com/caolan/async.git"},"bugs":{"url":"http://github.com/caolan/async/issues"},"licenses":[{"type":"MIT","url":"http://github.com/caolan/async/raw/master/LICENSE"}]};
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/async/package.json"]._cached = module.exports;
-    return module.exports;
-};
+});
 
-require.modules["/node_modules/async/index.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/async";
-    var __filename = "/node_modules/async/index.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/async");
+require.define("/node_modules/underscore/package.json", function (require, module, exports, __dirname, __filename) {
+module.exports = {"main":"underscore.js"}
+});
+
+require.define("/node_modules/underscore/underscore.js", function (require, module, exports, __dirname, __filename) {
+//     Underscore.js 1.3.1
+//     (c) 2009-2012 Jeremy Ashkenas, DocumentCloud Inc.
+//     Underscore is freely distributable under the MIT license.
+//     Portions of Underscore are inspired or borrowed from Prototype,
+//     Oliver Steele's Functional, and John Resig's Micro-Templating.
+//     For all details and documentation:
+//     http://documentcloud.github.com/underscore
+
+(function() {
+
+  // Baseline setup
+  // --------------
+
+  // Establish the root object, `window` in the browser, or `global` on the server.
+  var root = this;
+
+  // Save the previous value of the `_` variable.
+  var previousUnderscore = root._;
+
+  // Establish the object that gets returned to break out of a loop iteration.
+  var breaker = {};
+
+  // Save bytes in the minified (but not gzipped) version:
+  var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
+
+  // Create quick reference variables for speed access to core prototypes.
+  var slice            = ArrayProto.slice,
+      unshift          = ArrayProto.unshift,
+      toString         = ObjProto.toString,
+      hasOwnProperty   = ObjProto.hasOwnProperty;
+
+  // All **ECMAScript 5** native function implementations that we hope to use
+  // are declared here.
+  var
+    nativeForEach      = ArrayProto.forEach,
+    nativeMap          = ArrayProto.map,
+    nativeReduce       = ArrayProto.reduce,
+    nativeReduceRight  = ArrayProto.reduceRight,
+    nativeFilter       = ArrayProto.filter,
+    nativeEvery        = ArrayProto.every,
+    nativeSome         = ArrayProto.some,
+    nativeIndexOf      = ArrayProto.indexOf,
+    nativeLastIndexOf  = ArrayProto.lastIndexOf,
+    nativeIsArray      = Array.isArray,
+    nativeKeys         = Object.keys,
+    nativeBind         = FuncProto.bind;
+
+  // Create a safe reference to the Underscore object for use below.
+  var _ = function(obj) { return new wrapper(obj); };
+
+  // Export the Underscore object for **Node.js**, with
+  // backwards-compatibility for the old `require()` API. If we're in
+  // the browser, add `_` as a global object via a string identifier,
+  // for Closure Compiler "advanced" mode.
+  if (typeof exports !== 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
+      exports = module.exports = _;
+    }
+    exports._ = _;
+  } else {
+    root['_'] = _;
+  }
+
+  // Current version.
+  _.VERSION = '1.3.1';
+
+  // Collection Functions
+  // --------------------
+
+  // The cornerstone, an `each` implementation, aka `forEach`.
+  // Handles objects with the built-in `forEach`, arrays, and raw objects.
+  // Delegates to **ECMAScript 5**'s native `forEach` if available.
+  var each = _.each = _.forEach = function(obj, iterator, context) {
+    if (obj == null) return;
+    if (nativeForEach && obj.forEach === nativeForEach) {
+      obj.forEach(iterator, context);
+    } else if (obj.length === +obj.length) {
+      for (var i = 0, l = obj.length; i < l; i++) {
+        if (i in obj && iterator.call(context, obj[i], i, obj) === breaker) return;
+      }
+    } else {
+      for (var key in obj) {
+        if (_.has(obj, key)) {
+          if (iterator.call(context, obj[key], key, obj) === breaker) return;
+        }
+      }
+    }
+  };
+
+  // Return the results of applying the iterator to each element.
+  // Delegates to **ECMAScript 5**'s native `map` if available.
+  _.map = _.collect = function(obj, iterator, context) {
+    var results = [];
+    if (obj == null) return results;
+    if (nativeMap && obj.map === nativeMap) return obj.map(iterator, context);
+    each(obj, function(value, index, list) {
+      results[results.length] = iterator.call(context, value, index, list);
+    });
+    if (obj.length === +obj.length) results.length = obj.length;
+    return results;
+  };
+
+  // **Reduce** builds up a single result from a list of values, aka `inject`,
+  // or `foldl`. Delegates to **ECMAScript 5**'s native `reduce` if available.
+  _.reduce = _.foldl = _.inject = function(obj, iterator, memo, context) {
+    var initial = arguments.length > 2;
+    if (obj == null) obj = [];
+    if (nativeReduce && obj.reduce === nativeReduce) {
+      if (context) iterator = _.bind(iterator, context);
+      return initial ? obj.reduce(iterator, memo) : obj.reduce(iterator);
+    }
+    each(obj, function(value, index, list) {
+      if (!initial) {
+        memo = value;
+        initial = true;
+      } else {
+        memo = iterator.call(context, memo, value, index, list);
+      }
+    });
+    if (!initial) throw new TypeError('Reduce of empty array with no initial value');
+    return memo;
+  };
+
+  // The right-associative version of reduce, also known as `foldr`.
+  // Delegates to **ECMAScript 5**'s native `reduceRight` if available.
+  _.reduceRight = _.foldr = function(obj, iterator, memo, context) {
+    var initial = arguments.length > 2;
+    if (obj == null) obj = [];
+    if (nativeReduceRight && obj.reduceRight === nativeReduceRight) {
+      if (context) iterator = _.bind(iterator, context);
+      return initial ? obj.reduceRight(iterator, memo) : obj.reduceRight(iterator);
+    }
+    var reversed = _.toArray(obj).reverse();
+    if (context && !initial) iterator = _.bind(iterator, context);
+    return initial ? _.reduce(reversed, iterator, memo, context) : _.reduce(reversed, iterator);
+  };
+
+  // Return the first value which passes a truth test. Aliased as `detect`.
+  _.find = _.detect = function(obj, iterator, context) {
+    var result;
+    any(obj, function(value, index, list) {
+      if (iterator.call(context, value, index, list)) {
+        result = value;
+        return true;
+      }
+    });
+    return result;
+  };
+
+  // Return all the elements that pass a truth test.
+  // Delegates to **ECMAScript 5**'s native `filter` if available.
+  // Aliased as `select`.
+  _.filter = _.select = function(obj, iterator, context) {
+    var results = [];
+    if (obj == null) return results;
+    if (nativeFilter && obj.filter === nativeFilter) return obj.filter(iterator, context);
+    each(obj, function(value, index, list) {
+      if (iterator.call(context, value, index, list)) results[results.length] = value;
+    });
+    return results;
+  };
+
+  // Return all the elements for which a truth test fails.
+  _.reject = function(obj, iterator, context) {
+    var results = [];
+    if (obj == null) return results;
+    each(obj, function(value, index, list) {
+      if (!iterator.call(context, value, index, list)) results[results.length] = value;
+    });
+    return results;
+  };
+
+  // Determine whether all of the elements match a truth test.
+  // Delegates to **ECMAScript 5**'s native `every` if available.
+  // Aliased as `all`.
+  _.every = _.all = function(obj, iterator, context) {
+    var result = true;
+    if (obj == null) return result;
+    if (nativeEvery && obj.every === nativeEvery) return obj.every(iterator, context);
+    each(obj, function(value, index, list) {
+      if (!(result = result && iterator.call(context, value, index, list))) return breaker;
+    });
+    return result;
+  };
+
+  // Determine if at least one element in the object matches a truth test.
+  // Delegates to **ECMAScript 5**'s native `some` if available.
+  // Aliased as `any`.
+  var any = _.some = _.any = function(obj, iterator, context) {
+    iterator || (iterator = _.identity);
+    var result = false;
+    if (obj == null) return result;
+    if (nativeSome && obj.some === nativeSome) return obj.some(iterator, context);
+    each(obj, function(value, index, list) {
+      if (result || (result = iterator.call(context, value, index, list))) return breaker;
+    });
+    return !!result;
+  };
+
+  // Determine if a given value is included in the array or object using `===`.
+  // Aliased as `contains`.
+  _.include = _.contains = function(obj, target) {
+    var found = false;
+    if (obj == null) return found;
+    if (nativeIndexOf && obj.indexOf === nativeIndexOf) return obj.indexOf(target) != -1;
+    found = any(obj, function(value) {
+      return value === target;
+    });
+    return found;
+  };
+
+  // Invoke a method (with arguments) on every item in a collection.
+  _.invoke = function(obj, method) {
+    var args = slice.call(arguments, 2);
+    return _.map(obj, function(value) {
+      return (_.isFunction(method) ? method || value : value[method]).apply(value, args);
+    });
+  };
+
+  // Convenience version of a common use case of `map`: fetching a property.
+  _.pluck = function(obj, key) {
+    return _.map(obj, function(value){ return value[key]; });
+  };
+
+  // Return the maximum element or (element-based computation).
+  _.max = function(obj, iterator, context) {
+    if (!iterator && _.isArray(obj)) return Math.max.apply(Math, obj);
+    if (!iterator && _.isEmpty(obj)) return -Infinity;
+    var result = {computed : -Infinity};
+    each(obj, function(value, index, list) {
+      var computed = iterator ? iterator.call(context, value, index, list) : value;
+      computed >= result.computed && (result = {value : value, computed : computed});
+    });
+    return result.value;
+  };
+
+  // Return the minimum element (or element-based computation).
+  _.min = function(obj, iterator, context) {
+    if (!iterator && _.isArray(obj)) return Math.min.apply(Math, obj);
+    if (!iterator && _.isEmpty(obj)) return Infinity;
+    var result = {computed : Infinity};
+    each(obj, function(value, index, list) {
+      var computed = iterator ? iterator.call(context, value, index, list) : value;
+      computed < result.computed && (result = {value : value, computed : computed});
+    });
+    return result.value;
+  };
+
+  // Shuffle an array.
+  _.shuffle = function(obj) {
+    var shuffled = [], rand;
+    each(obj, function(value, index, list) {
+      if (index == 0) {
+        shuffled[0] = value;
+      } else {
+        rand = Math.floor(Math.random() * (index + 1));
+        shuffled[index] = shuffled[rand];
+        shuffled[rand] = value;
+      }
+    });
+    return shuffled;
+  };
+
+  // Sort the object's values by a criterion produced by an iterator.
+  _.sortBy = function(obj, iterator, context) {
+    return _.pluck(_.map(obj, function(value, index, list) {
+      return {
+        value : value,
+        criteria : iterator.call(context, value, index, list)
+      };
+    }).sort(function(left, right) {
+      var a = left.criteria, b = right.criteria;
+      return a < b ? -1 : a > b ? 1 : 0;
+    }), 'value');
+  };
+
+  // Groups the object's values by a criterion. Pass either a string attribute
+  // to group by, or a function that returns the criterion.
+  _.groupBy = function(obj, val) {
+    var result = {};
+    var iterator = _.isFunction(val) ? val : function(obj) { return obj[val]; };
+    each(obj, function(value, index) {
+      var key = iterator(value, index);
+      (result[key] || (result[key] = [])).push(value);
+    });
+    return result;
+  };
+
+  // Use a comparator function to figure out at what index an object should
+  // be inserted so as to maintain order. Uses binary search.
+  _.sortedIndex = function(array, obj, iterator) {
+    iterator || (iterator = _.identity);
+    var low = 0, high = array.length;
+    while (low < high) {
+      var mid = (low + high) >> 1;
+      iterator(array[mid]) < iterator(obj) ? low = mid + 1 : high = mid;
+    }
+    return low;
+  };
+
+  // Safely convert anything iterable into a real, live array.
+  _.toArray = function(iterable) {
+    if (!iterable)                return [];
+    if (iterable.toArray)         return iterable.toArray();
+    if (_.isArray(iterable))      return slice.call(iterable);
+    if (_.isArguments(iterable))  return slice.call(iterable);
+    return _.values(iterable);
+  };
+
+  // Return the number of elements in an object.
+  _.size = function(obj) {
+    return _.toArray(obj).length;
+  };
+
+  // Array Functions
+  // ---------------
+
+  // Get the first element of an array. Passing **n** will return the first N
+  // values in the array. Aliased as `head`. The **guard** check allows it to work
+  // with `_.map`.
+  _.first = _.head = function(array, n, guard) {
+    return (n != null) && !guard ? slice.call(array, 0, n) : array[0];
+  };
+
+  // Returns everything but the last entry of the array. Especcialy useful on
+  // the arguments object. Passing **n** will return all the values in
+  // the array, excluding the last N. The **guard** check allows it to work with
+  // `_.map`.
+  _.initial = function(array, n, guard) {
+    return slice.call(array, 0, array.length - ((n == null) || guard ? 1 : n));
+  };
+
+  // Get the last element of an array. Passing **n** will return the last N
+  // values in the array. The **guard** check allows it to work with `_.map`.
+  _.last = function(array, n, guard) {
+    if ((n != null) && !guard) {
+      return slice.call(array, Math.max(array.length - n, 0));
+    } else {
+      return array[array.length - 1];
+    }
+  };
+
+  // Returns everything but the first entry of the array. Aliased as `tail`.
+  // Especially useful on the arguments object. Passing an **index** will return
+  // the rest of the values in the array from that index onward. The **guard**
+  // check allows it to work with `_.map`.
+  _.rest = _.tail = function(array, index, guard) {
+    return slice.call(array, (index == null) || guard ? 1 : index);
+  };
+
+  // Trim out all falsy values from an array.
+  _.compact = function(array) {
+    return _.filter(array, function(value){ return !!value; });
+  };
+
+  // Return a completely flattened version of an array.
+  _.flatten = function(array, shallow) {
+    return _.reduce(array, function(memo, value) {
+      if (_.isArray(value)) return memo.concat(shallow ? value : _.flatten(value));
+      memo[memo.length] = value;
+      return memo;
+    }, []);
+  };
+
+  // Return a version of the array that does not contain the specified value(s).
+  _.without = function(array) {
+    return _.difference(array, slice.call(arguments, 1));
+  };
+
+  // Produce a duplicate-free version of the array. If the array has already
+  // been sorted, you have the option of using a faster algorithm.
+  // Aliased as `unique`.
+  _.uniq = _.unique = function(array, isSorted, iterator) {
+    var initial = iterator ? _.map(array, iterator) : array;
+    var result = [];
+    _.reduce(initial, function(memo, el, i) {
+      if (0 == i || (isSorted === true ? _.last(memo) != el : !_.include(memo, el))) {
+        memo[memo.length] = el;
+        result[result.length] = array[i];
+      }
+      return memo;
+    }, []);
+    return result;
+  };
+
+  // Produce an array that contains the union: each distinct element from all of
+  // the passed-in arrays.
+  _.union = function() {
+    return _.uniq(_.flatten(arguments, true));
+  };
+
+  // Produce an array that contains every item shared between all the
+  // passed-in arrays. (Aliased as "intersect" for back-compat.)
+  _.intersection = _.intersect = function(array) {
+    var rest = slice.call(arguments, 1);
+    return _.filter(_.uniq(array), function(item) {
+      return _.every(rest, function(other) {
+        return _.indexOf(other, item) >= 0;
+      });
+    });
+  };
+
+  // Take the difference between one array and a number of other arrays.
+  // Only the elements present in just the first array will remain.
+  _.difference = function(array) {
+    var rest = _.flatten(slice.call(arguments, 1));
+    return _.filter(array, function(value){ return !_.include(rest, value); });
+  };
+
+  // Zip together multiple lists into a single array -- elements that share
+  // an index go together.
+  _.zip = function() {
+    var args = slice.call(arguments);
+    var length = _.max(_.pluck(args, 'length'));
+    var results = new Array(length);
+    for (var i = 0; i < length; i++) results[i] = _.pluck(args, "" + i);
+    return results;
+  };
+
+  // If the browser doesn't supply us with indexOf (I'm looking at you, **MSIE**),
+  // we need this function. Return the position of the first occurrence of an
+  // item in an array, or -1 if the item is not included in the array.
+  // Delegates to **ECMAScript 5**'s native `indexOf` if available.
+  // If the array is large and already in sort order, pass `true`
+  // for **isSorted** to use binary search.
+  _.indexOf = function(array, item, isSorted) {
+    if (array == null) return -1;
+    var i, l;
+    if (isSorted) {
+      i = _.sortedIndex(array, item);
+      return array[i] === item ? i : -1;
+    }
+    if (nativeIndexOf && array.indexOf === nativeIndexOf) return array.indexOf(item);
+    for (i = 0, l = array.length; i < l; i++) if (i in array && array[i] === item) return i;
+    return -1;
+  };
+
+  // Delegates to **ECMAScript 5**'s native `lastIndexOf` if available.
+  _.lastIndexOf = function(array, item) {
+    if (array == null) return -1;
+    if (nativeLastIndexOf && array.lastIndexOf === nativeLastIndexOf) return array.lastIndexOf(item);
+    var i = array.length;
+    while (i--) if (i in array && array[i] === item) return i;
+    return -1;
+  };
+
+  // Generate an integer Array containing an arithmetic progression. A port of
+  // the native Python `range()` function. See
+  // [the Python documentation](http://docs.python.org/library/functions.html#range).
+  _.range = function(start, stop, step) {
+    if (arguments.length <= 1) {
+      stop = start || 0;
+      start = 0;
+    }
+    step = arguments[2] || 1;
+
+    var len = Math.max(Math.ceil((stop - start) / step), 0);
+    var idx = 0;
+    var range = new Array(len);
+
+    while(idx < len) {
+      range[idx++] = start;
+      start += step;
+    }
+
+    return range;
+  };
+
+  // Function (ahem) Functions
+  // ------------------
+
+  // Reusable constructor function for prototype setting.
+  var ctor = function(){};
+
+  // Create a function bound to a given object (assigning `this`, and arguments,
+  // optionally). Binding with arguments is also known as `curry`.
+  // Delegates to **ECMAScript 5**'s native `Function.bind` if available.
+  // We check for `func.bind` first, to fail fast when `func` is undefined.
+  _.bind = function bind(func, context) {
+    var bound, args;
+    if (func.bind === nativeBind && nativeBind) return nativeBind.apply(func, slice.call(arguments, 1));
+    if (!_.isFunction(func)) throw new TypeError;
+    args = slice.call(arguments, 2);
+    return bound = function() {
+      if (!(this instanceof bound)) return func.apply(context, args.concat(slice.call(arguments)));
+      ctor.prototype = func.prototype;
+      var self = new ctor;
+      var result = func.apply(self, args.concat(slice.call(arguments)));
+      if (Object(result) === result) return result;
+      return self;
     };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/async");
+  };
+
+  // Bind all of an object's methods to that object. Useful for ensuring that
+  // all callbacks defined on an object belong to it.
+  _.bindAll = function(obj) {
+    var funcs = slice.call(arguments, 1);
+    if (funcs.length == 0) funcs = _.functions(obj);
+    each(funcs, function(f) { obj[f] = _.bind(obj[f], obj); });
+    return obj;
+  };
+
+  // Memoize an expensive function by storing its results.
+  _.memoize = function(func, hasher) {
+    var memo = {};
+    hasher || (hasher = _.identity);
+    return function() {
+      var key = hasher.apply(this, arguments);
+      return _.has(memo, key) ? memo[key] : (memo[key] = func.apply(this, arguments));
     };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/async/index.js"]._cached = module.exports;
-    
-    (function () {
-        // This file is just added for convenience so this repository can be
+  };
+
+  // Delays a function for the given number of milliseconds, and then calls
+  // it with the arguments supplied.
+  _.delay = function(func, wait) {
+    var args = slice.call(arguments, 2);
+    return setTimeout(function(){ return func.apply(func, args); }, wait);
+  };
+
+  // Defers a function, scheduling it to run after the current call stack has
+  // cleared.
+  _.defer = function(func) {
+    return _.delay.apply(_, [func, 1].concat(slice.call(arguments, 1)));
+  };
+
+  // Returns a function, that, when invoked, will only be triggered at most once
+  // during a given window of time.
+  _.throttle = function(func, wait) {
+    var context, args, timeout, throttling, more;
+    var whenDone = _.debounce(function(){ more = throttling = false; }, wait);
+    return function() {
+      context = this; args = arguments;
+      var later = function() {
+        timeout = null;
+        if (more) func.apply(context, args);
+        whenDone();
+      };
+      if (!timeout) timeout = setTimeout(later, wait);
+      if (throttling) {
+        more = true;
+      } else {
+        func.apply(context, args);
+      }
+      whenDone();
+      throttling = true;
+    };
+  };
+
+  // Returns a function, that, as long as it continues to be invoked, will not
+  // be triggered. The function will be called after it stops being called for
+  // N milliseconds.
+  _.debounce = function(func, wait) {
+    var timeout;
+    return function() {
+      var context = this, args = arguments;
+      var later = function() {
+        timeout = null;
+        func.apply(context, args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // Returns a function that will be executed at most one time, no matter how
+  // often you call it. Useful for lazy initialization.
+  _.once = function(func) {
+    var ran = false, memo;
+    return function() {
+      if (ran) return memo;
+      ran = true;
+      return memo = func.apply(this, arguments);
+    };
+  };
+
+  // Returns the first function passed as an argument to the second,
+  // allowing you to adjust arguments, run code before and after, and
+  // conditionally execute the original function.
+  _.wrap = function(func, wrapper) {
+    return function() {
+      var args = [func].concat(slice.call(arguments, 0));
+      return wrapper.apply(this, args);
+    };
+  };
+
+  // Returns a function that is the composition of a list of functions, each
+  // consuming the return value of the function that follows.
+  _.compose = function() {
+    var funcs = arguments;
+    return function() {
+      var args = arguments;
+      for (var i = funcs.length - 1; i >= 0; i--) {
+        args = [funcs[i].apply(this, args)];
+      }
+      return args[0];
+    };
+  };
+
+  // Returns a function that will only be executed after being called N times.
+  _.after = function(times, func) {
+    if (times <= 0) return func();
+    return function() {
+      if (--times < 1) { return func.apply(this, arguments); }
+    };
+  };
+
+  // Object Functions
+  // ----------------
+
+  // Retrieve the names of an object's properties.
+  // Delegates to **ECMAScript 5**'s native `Object.keys`
+  _.keys = nativeKeys || function(obj) {
+    if (obj !== Object(obj)) throw new TypeError('Invalid object');
+    var keys = [];
+    for (var key in obj) if (_.has(obj, key)) keys[keys.length] = key;
+    return keys;
+  };
+
+  // Retrieve the values of an object's properties.
+  _.values = function(obj) {
+    return _.map(obj, _.identity);
+  };
+
+  // Return a sorted list of the function names available on the object.
+  // Aliased as `methods`
+  _.functions = _.methods = function(obj) {
+    var names = [];
+    for (var key in obj) {
+      if (_.isFunction(obj[key])) names.push(key);
+    }
+    return names.sort();
+  };
+
+  // Extend a given object with all the properties in passed-in object(s).
+  _.extend = function(obj) {
+    each(slice.call(arguments, 1), function(source) {
+      for (var prop in source) {
+        obj[prop] = source[prop];
+      }
+    });
+    return obj;
+  };
+
+  // Fill in a given object with default properties.
+  _.defaults = function(obj) {
+    each(slice.call(arguments, 1), function(source) {
+      for (var prop in source) {
+        if (obj[prop] == null) obj[prop] = source[prop];
+      }
+    });
+    return obj;
+  };
+
+  // Create a (shallow-cloned) duplicate of an object.
+  _.clone = function(obj) {
+    if (!_.isObject(obj)) return obj;
+    return _.isArray(obj) ? obj.slice() : _.extend({}, obj);
+  };
+
+  // Invokes interceptor with the obj, and then returns obj.
+  // The primary purpose of this method is to "tap into" a method chain, in
+  // order to perform operations on intermediate results within the chain.
+  _.tap = function(obj, interceptor) {
+    interceptor(obj);
+    return obj;
+  };
+
+  // Internal recursive comparison function.
+  function eq(a, b, stack) {
+    // Identical objects are equal. `0 === -0`, but they aren't identical.
+    // See the Harmony `egal` proposal: http://wiki.ecmascript.org/doku.php?id=harmony:egal.
+    if (a === b) return a !== 0 || 1 / a == 1 / b;
+    // A strict comparison is necessary because `null == undefined`.
+    if (a == null || b == null) return a === b;
+    // Unwrap any wrapped objects.
+    if (a._chain) a = a._wrapped;
+    if (b._chain) b = b._wrapped;
+    // Invoke a custom `isEqual` method if one is provided.
+    if (a.isEqual && _.isFunction(a.isEqual)) return a.isEqual(b);
+    if (b.isEqual && _.isFunction(b.isEqual)) return b.isEqual(a);
+    // Compare `[[Class]]` names.
+    var className = toString.call(a);
+    if (className != toString.call(b)) return false;
+    switch (className) {
+      // Strings, numbers, dates, and booleans are compared by value.
+      case '[object String]':
+        // Primitives and their corresponding object wrappers are equivalent; thus, `"5"` is
+        // equivalent to `new String("5")`.
+        return a == String(b);
+      case '[object Number]':
+        // `NaN`s are equivalent, but non-reflexive. An `egal` comparison is performed for
+        // other numeric values.
+        return a != +a ? b != +b : (a == 0 ? 1 / a == 1 / b : a == +b);
+      case '[object Date]':
+      case '[object Boolean]':
+        // Coerce dates and booleans to numeric primitive values. Dates are compared by their
+        // millisecond representations. Note that invalid dates with millisecond representations
+        // of `NaN` are not equivalent.
+        return +a == +b;
+      // RegExps are compared by their source patterns and flags.
+      case '[object RegExp]':
+        return a.source == b.source &&
+               a.global == b.global &&
+               a.multiline == b.multiline &&
+               a.ignoreCase == b.ignoreCase;
+    }
+    if (typeof a != 'object' || typeof b != 'object') return false;
+    // Assume equality for cyclic structures. The algorithm for detecting cyclic
+    // structures is adapted from ES 5.1 section 15.12.3, abstract operation `JO`.
+    var length = stack.length;
+    while (length--) {
+      // Linear search. Performance is inversely proportional to the number of
+      // unique nested structures.
+      if (stack[length] == a) return true;
+    }
+    // Add the first object to the stack of traversed objects.
+    stack.push(a);
+    var size = 0, result = true;
+    // Recursively compare objects and arrays.
+    if (className == '[object Array]') {
+      // Compare array lengths to determine if a deep comparison is necessary.
+      size = a.length;
+      result = size == b.length;
+      if (result) {
+        // Deep compare the contents, ignoring non-numeric properties.
+        while (size--) {
+          // Ensure commutative equality for sparse arrays.
+          if (!(result = size in a == size in b && eq(a[size], b[size], stack))) break;
+        }
+      }
+    } else {
+      // Objects with different constructors are not equivalent.
+      if ('constructor' in a != 'constructor' in b || a.constructor != b.constructor) return false;
+      // Deep compare objects.
+      for (var key in a) {
+        if (_.has(a, key)) {
+          // Count the expected number of properties.
+          size++;
+          // Deep compare each member.
+          if (!(result = _.has(b, key) && eq(a[key], b[key], stack))) break;
+        }
+      }
+      // Ensure that both objects contain the same number of properties.
+      if (result) {
+        for (key in b) {
+          if (_.has(b, key) && !(size--)) break;
+        }
+        result = !size;
+      }
+    }
+    // Remove the first object from the stack of traversed objects.
+    stack.pop();
+    return result;
+  }
+
+  // Perform a deep comparison to check if two objects are equal.
+  _.isEqual = function(a, b) {
+    return eq(a, b, []);
+  };
+
+  // Is a given array, string, or object empty?
+  // An "empty" object has no enumerable own-properties.
+  _.isEmpty = function(obj) {
+    if (_.isArray(obj) || _.isString(obj)) return obj.length === 0;
+    for (var key in obj) if (_.has(obj, key)) return false;
+    return true;
+  };
+
+  // Is a given value a DOM element?
+  _.isElement = function(obj) {
+    return !!(obj && obj.nodeType == 1);
+  };
+
+  // Is a given value an array?
+  // Delegates to ECMA5's native Array.isArray
+  _.isArray = nativeIsArray || function(obj) {
+    return toString.call(obj) == '[object Array]';
+  };
+
+  // Is a given variable an object?
+  _.isObject = function(obj) {
+    return obj === Object(obj);
+  };
+
+  // Is a given variable an arguments object?
+  _.isArguments = function(obj) {
+    return toString.call(obj) == '[object Arguments]';
+  };
+  if (!_.isArguments(arguments)) {
+    _.isArguments = function(obj) {
+      return !!(obj && _.has(obj, 'callee'));
+    };
+  }
+
+  // Is a given value a function?
+  _.isFunction = function(obj) {
+    return toString.call(obj) == '[object Function]';
+  };
+
+  // Is a given value a string?
+  _.isString = function(obj) {
+    return toString.call(obj) == '[object String]';
+  };
+
+  // Is a given value a number?
+  _.isNumber = function(obj) {
+    return toString.call(obj) == '[object Number]';
+  };
+
+  // Is the given value `NaN`?
+  _.isNaN = function(obj) {
+    // `NaN` is the only value for which `===` is not reflexive.
+    return obj !== obj;
+  };
+
+  // Is a given value a boolean?
+  _.isBoolean = function(obj) {
+    return obj === true || obj === false || toString.call(obj) == '[object Boolean]';
+  };
+
+  // Is a given value a date?
+  _.isDate = function(obj) {
+    return toString.call(obj) == '[object Date]';
+  };
+
+  // Is the given value a regular expression?
+  _.isRegExp = function(obj) {
+    return toString.call(obj) == '[object RegExp]';
+  };
+
+  // Is a given value equal to null?
+  _.isNull = function(obj) {
+    return obj === null;
+  };
+
+  // Is a given variable undefined?
+  _.isUndefined = function(obj) {
+    return obj === void 0;
+  };
+
+  // Has own property?
+  _.has = function(obj, key) {
+    return hasOwnProperty.call(obj, key);
+  };
+
+  // Utility Functions
+  // -----------------
+
+  // Run Underscore.js in *noConflict* mode, returning the `_` variable to its
+  // previous owner. Returns a reference to the Underscore object.
+  _.noConflict = function() {
+    root._ = previousUnderscore;
+    return this;
+  };
+
+  // Keep the identity function around for default iterators.
+  _.identity = function(value) {
+    return value;
+  };
+
+  // Run a function **n** times.
+  _.times = function (n, iterator, context) {
+    for (var i = 0; i < n; i++) iterator.call(context, i);
+  };
+
+  // Escape a string for HTML interpolation.
+  _.escape = function(string) {
+    return (''+string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;').replace(/\//g,'&#x2F;');
+  };
+
+  // Add your own custom functions to the Underscore object, ensuring that
+  // they're correctly added to the OOP wrapper as well.
+  _.mixin = function(obj) {
+    each(_.functions(obj), function(name){
+      addToWrapper(name, _[name] = obj[name]);
+    });
+  };
+
+  // Generate a unique integer id (unique within the entire client session).
+  // Useful for temporary DOM ids.
+  var idCounter = 0;
+  _.uniqueId = function(prefix) {
+    var id = idCounter++;
+    return prefix ? prefix + id : id;
+  };
+
+  // By default, Underscore uses ERB-style template delimiters, change the
+  // following template settings to use alternative delimiters.
+  _.templateSettings = {
+    evaluate    : /<%([\s\S]+?)%>/g,
+    interpolate : /<%=([\s\S]+?)%>/g,
+    escape      : /<%-([\s\S]+?)%>/g
+  };
+
+  // When customizing `templateSettings`, if you don't want to define an
+  // interpolation, evaluation or escaping regex, we need one that is
+  // guaranteed not to match.
+  var noMatch = /.^/;
+
+  // Within an interpolation, evaluation, or escaping, remove HTML escaping
+  // that had been previously added.
+  var unescape = function(code) {
+    return code.replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+  };
+
+  // JavaScript micro-templating, similar to John Resig's implementation.
+  // Underscore templating handles arbitrary delimiters, preserves whitespace,
+  // and correctly escapes quotes within interpolated code.
+  _.template = function(str, data) {
+    var c  = _.templateSettings;
+    var tmpl = 'var __p=[],print=function(){__p.push.apply(__p,arguments);};' +
+      'with(obj||{}){__p.push(\'' +
+      str.replace(/\\/g, '\\\\')
+         .replace(/'/g, "\\'")
+         .replace(c.escape || noMatch, function(match, code) {
+           return "',_.escape(" + unescape(code) + "),'";
+         })
+         .replace(c.interpolate || noMatch, function(match, code) {
+           return "'," + unescape(code) + ",'";
+         })
+         .replace(c.evaluate || noMatch, function(match, code) {
+           return "');" + unescape(code).replace(/[\r\n\t]/g, ' ') + ";__p.push('";
+         })
+         .replace(/\r/g, '\\r')
+         .replace(/\n/g, '\\n')
+         .replace(/\t/g, '\\t')
+         + "');}return __p.join('');";
+    var func = new Function('obj', '_', tmpl);
+    if (data) return func(data, _);
+    return function(data) {
+      return func.call(this, data, _);
+    };
+  };
+
+  // Add a "chain" function, which will delegate to the wrapper.
+  _.chain = function(obj) {
+    return _(obj).chain();
+  };
+
+  // The OOP Wrapper
+  // ---------------
+
+  // If Underscore is called as a function, it returns a wrapped object that
+  // can be used OO-style. This wrapper holds altered versions of all the
+  // underscore functions. Wrapped objects may be chained.
+  var wrapper = function(obj) { this._wrapped = obj; };
+
+  // Expose `wrapper.prototype` as `_.prototype`
+  _.prototype = wrapper.prototype;
+
+  // Helper function to continue chaining intermediate results.
+  var result = function(obj, chain) {
+    return chain ? _(obj).chain() : obj;
+  };
+
+  // A method to easily add functions to the OOP wrapper.
+  var addToWrapper = function(name, func) {
+    wrapper.prototype[name] = function() {
+      var args = slice.call(arguments);
+      unshift.call(args, this._wrapped);
+      return result(func.apply(_, args), this._chain);
+    };
+  };
+
+  // Add all of the Underscore functions to the wrapper object.
+  _.mixin(_);
+
+  // Add all mutator Array functions to the wrapper.
+  each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
+    var method = ArrayProto[name];
+    wrapper.prototype[name] = function() {
+      var wrapped = this._wrapped;
+      method.apply(wrapped, arguments);
+      var length = wrapped.length;
+      if ((name == 'shift' || name == 'splice') && length === 0) delete wrapped[0];
+      return result(wrapped, this._chain);
+    };
+  });
+
+  // Add all accessor Array functions to the wrapper.
+  each(['concat', 'join', 'slice'], function(name) {
+    var method = ArrayProto[name];
+    wrapper.prototype[name] = function() {
+      return result(method.apply(this._wrapped, arguments), this._chain);
+    };
+  });
+
+  // Start chaining a wrapped Underscore object.
+  wrapper.prototype.chain = function() {
+    this._chain = true;
+    return this;
+  };
+
+  // Extracts the result from a wrapped and chained object.
+  wrapper.prototype.value = function() {
+    return this._wrapped;
+  };
+
+}).call(this);
+
+});
+
+require.define("/node_modules/async/package.json", function (require, module, exports, __dirname, __filename) {
+module.exports = {"main":"./index"}
+});
+
+require.define("/node_modules/async/index.js", function (require, module, exports, __dirname, __filename) {
+// This file is just added for convenience so this repository can be
 // directly checked out into a project's deps folder
 module.exports = require('./lib/async');
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/async/index.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/async/lib/async.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/async/lib";
-    var __filename = "/node_modules/async/lib/async.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/async/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/async/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/async/lib/async.js"]._cached = module.exports;
-    
-    (function () {
-        /*global setTimeout: false, console: false */
+});
+
+require.define("/node_modules/async/lib/async.js", function (require, module, exports, __dirname, __filename) {
+/*global setTimeout: false, console: false */
 (function () {
 
     var async = {};
@@ -1331,18 +2135,6 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
         return keys;
     };
 
-    var _indexOf = function (arr, item) {
-        if (arr.indexOf) {
-            return arr.indexOf(item);
-        }
-        for (var i = 0; i < arr.length; i += 1) {
-            if (arr[i] === item) {
-                return i;
-            }
-        }
-        return -1;
-    };
-
     //// exported async module functions ////
 
     //// nextTick implementation with browser-compatible fallback ////
@@ -1356,6 +2148,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     }
 
     async.forEach = function (arr, iterator, callback) {
+        callback = callback || function () {};
         if (!arr.length) {
             return callback();
         }
@@ -1377,6 +2170,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     };
 
     async.forEachSeries = function (arr, iterator, callback) {
+        callback = callback || function () {};
         if (!arr.length) {
             return callback();
         }
@@ -1402,6 +2196,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     };
     
     async.forEachLimit = function (arr, limit, iterator, callback) {
+        callback = callback || function () {};
         if (!arr.length || limit <= 0) {
             return callback(); 
         }
@@ -1643,7 +2438,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
             }
         };
         var taskComplete = function () {
-            _forEach(listeners, function (fn) {
+            _forEach(listeners.slice(0), function (fn) {
                 fn();
             });
         };
@@ -1651,6 +2446,7 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
         addListener(function () {
             if (_keys(results).length === keys.length) {
                 callback(null, results);
+                callback = function () {};
             }
         });
 
@@ -1693,10 +2489,10 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     };
 
     async.waterfall = function (tasks, callback) {
+        callback = callback || function () {};
         if (!tasks.length) {
             return callback();
         }
-        callback = callback || function () {};
         var wrapIterator = function (iterator) {
             return function (err) {
                 if (err) {
@@ -1861,9 +2657,19 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
             empty: null,
             drain: null,
             push: function (data, callback) {
-                q.tasks.push({data: data, callback: callback});
-                if(q.saturated && q.tasks.length == concurrency) q.saturated();
-                async.nextTick(q.process);
+                if(data.constructor !== Array) {
+                    data = [data];
+                }
+                _forEach(data, function(task) {
+                    q.tasks.push({
+                        data: task,
+                        callback: typeof callback === 'function' ? callback : null
+                    });
+                    if (q.saturated && q.tasks.length == concurrency) {
+                        q.saturated();
+                    }
+                    async.nextTick(q.process);
+                });
             },
             process: function () {
                 if (workers < q.concurrency && q.tasks.length) {
@@ -1955,32 +2761,11 @@ require.modules["/node_modules/async/lib/async.js"] = function () {
     };
 
 }());
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/async/lib/async.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions-events.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/directions-events.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions-events.js"]._cached = module.exports;
-    
-    (function () {
-        var DirectionsEvents = module.exports = function() {
+});
+
+require.define("/lib/directions-events.js", function (require, module, exports, __dirname, __filename) {
+var DirectionsEvents = module.exports = function() {
   // Geocode using GMaps API and assign first result to property
   this.geocode = function(directions, addressProperty, property) {
     return function(callback) {
@@ -2017,32 +2802,11 @@ DirectionsEvents.GeocodeError = function(message) {
   this.name = 'GeocodeError';
   this.message = (message) ? message : 'Failed to goecode';
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions-events.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment-factory.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/segment-factory.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment-factory.js"]._cached = module.exports;
-    
-    (function () {
-        var AmtrakingSegment = require('./segment/amtraking-segment'),
+});
+
+require.define("/lib/segment-factory.js", function (require, module, exports, __dirname, __filename) {
+var AmtrakingSegment = require('./segment/amtraking-segment'),
     BicyclingSegment = require('./segment/bicycling-segment'),
     BussingSegment = require('./segment/bussing-segment'),
     CommuterRailingSegment = require('./segment/commuter-railing-segment'),
@@ -2064,6 +2828,10 @@ var SegmentFactory = module.exports = {
       return new SubwayingSegment(index, step);
     } else if(step.travel_mode == 'SUBWAYING') {
       return new SubwayingSegment(index, step);
+    } else if(step.travel_mode == 'RAIL') {
+      return new SubwayingSegment(index, step);
+    } else if(step.travel_mode == 'AUTO') {
+      return new WalkingSegment(index, step);
     } else if(step.travel_mode == 'BUSSING') {
       return new BussingSegment(index, step);
     } else if(step.travel_mode == 'LIGHTRAILING') {
@@ -2079,105 +2847,39 @@ var SegmentFactory = module.exports = {
     }
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment-factory.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/amtraking-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/amtraking-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/amtraking-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    HopStopSegment = require('./hop-stop-segment');
+});
+
+require.define("/lib/segment/amtraking-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
 
 var AmtrakingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.rail_class = 'intercity rail';
 }
-AmtrakingSegment.prototype = new HopStopSegment();
+AmtrakingSegment.prototype = new Segment();
 
 CM1.extend(AmtrakingSegment, {
   model: 'rail_trip',
-  provides: ['duration', 'rail_class', { 'distance_estimate': 'distance' }]
+  provides: ['distance', 'rail_class']
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/amtraking-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/CM1/package.json"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1";
-    var __filename = "/node_modules/CM1/package.json";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
-    
-    (function () {
-        module.exports = {"name":"CM1","version":"0.6.0","author":"Derek Kastner <dkastner@gmail.com>","description":"JavaScript API for Brighter Planet's CM1 carbon/impact calculation service","homepage":"http://github.com/brighterplanet/CM1.js","main":"lib/cm1.js","engine":"*","devDependencies":{"async":"*","browserify":"*","coffee-script":"*","dkastner-http-browserify":"*","docco":"*","fakeweb":"*","jsdom":"*","sinon":"*","socket.io-client":"*","vows":"*"},"repository":{"type":"git","url":"git://github.com/brighterplanet/CM1.js.git"},"dependencies":{},"engines":{"node":"*"}};
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/package.json"]._cached = module.exports;
-    return module.exports;
-};
+});
 
-require.modules["/node_modules/CM1/lib/cm1.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib";
-    var __filename = "/node_modules/CM1/lib/cm1.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/cm1.js"]._cached = module.exports;
-    
-    (function () {
-        // Carbon, energy, and other environmental impact calculations for your 
+require.define("/node_modules/CM1/package.json", function (require, module, exports, __dirname, __filename) {
+module.exports = {"main":"lib/cm1.js"}
+});
+
+require.define("/node_modules/CM1/lib/cm1.js", function (require, module, exports, __dirname, __filename) {
+// Carbon, energy, and other environmental impact calculations for your 
 // JavaScript objects. Built for the browser and Node.js.
+var _ = require('underscore');
+
 var ImpactEstimate = require('./impact-estimate'),
   ImpactEstimator = require('./impact-estimator');
 
-var CM1 = module.exports = function() {
+var CM1 = function() {
   this.attributeMap = {};
 };
 
@@ -2227,19 +2929,16 @@ CM1.impacts = function(type, properties, callback) {
 //     });
 // 
 CM1.model = function(type, properties) {
-  var attributes = Object.keys(properties);
-
   var proto = function() {};
   CM1.extend(proto, {
     model: type,
-    provides: attributes
+    provides: _.keys(properties)
   });
 
   var object = new proto();
-  for(var i = 0; i < attributes.length; i++) {
-    var attribute = attributes[i];
-    object[attribute] = properties[attribute];
-  }
+  _.each(properties, function(value, key) {
+    object[key] = value;
+  });
 
   return object;
 };
@@ -2331,15 +3030,24 @@ CM1.prototype.key = function() {
 // performed. This is ideal for when one or only a few calculations are made at 
 // a given time.
 CM1.useHttpAdapter = function() {
-  var HttpAdapter = require('./adapters/http-adapter');
-  CM1.adapter = new HttpAdapter();
+  CM1.setAdapter('http');
 };
 
 // The **Websockets** adapter is ideal for when many calculations need to be made at once.
 // You will need to `npm install socket.io-client` to use this.
 CM1.useWebsocketAdapter = function() {
-  var WebsocketAdapter = require('./adapters/websocket-adapter');
-  CM1.adapter = new WebsocketAdapter();
+  CM1.setAdapter('websocket');
+};
+
+// You can define process.env.CM1_ADAPTER to 'http' or 'websocket'. 
+// Otherwise, CM1 defaults to the HTTP adapter
+CM1.setAdapter = function(type) {
+  process.env = process.env || {};
+  type = type || process.env.CM1_ADAPTER || 'http';
+  var adapter = type == 'http' ? 
+    require('./adapters/http-adapter') :
+    require('./adapters/websocket-adapter');
+  CM1.adapter = new adapter();
 };
 
 // ## Etc.
@@ -2389,7 +3097,7 @@ CM1.prototype.underscore = function(string) {
 };
 
 CM1.prototype.adapter = function() {
-  if(!CM1.adapter) CM1.useHttpAdapter();
+  if(!CM1.adapter) CM1.setAdapter();
   return CM1.adapter;
 };
 
@@ -2400,32 +3108,13 @@ CM1.ImpactEstimator = ImpactEstimator;
 // 
 // CM1.js can be used with [browserify](http://github.com/substack/node-browserify).
 // Simply `npm install CM1` and `require('CM1')` in your code.
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/cm1.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/CM1/lib/impact-estimate.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib";
-    var __filename = "/node_modules/CM1/lib/impact-estimate.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/impact-estimate.js"]._cached = module.exports;
-    
-    (function () {
-        var ImpactEstimate = module.exports = function(subject, data) {
+module.exports = CM1;
+
+});
+
+require.define("/node_modules/CM1/lib/impact-estimate.js", function (require, module, exports, __dirname, __filename) {
+var ImpactEstimate = module.exports = function(subject, data) {
   this.subject = subject;
   this.data = data;
 
@@ -2441,32 +3130,11 @@ var proxyDataProperties = function(estimate, data) {
     estimate[property] = data[property];
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/impact-estimate.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/CM1/lib/impact-estimator.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib";
-    var __filename = "/node_modules/CM1/lib/impact-estimator.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/impact-estimator.js"]._cached = module.exports;
-    
-    (function () {
-        var ImpactEstimate = require('./impact-estimate');
+});
+
+require.define("/node_modules/CM1/lib/impact-estimator.js", function (require, module, exports, __dirname, __filename) {
+var ImpactEstimate = require('./impact-estimate');
 
 var ImpactEstimator = module.exports = function(cm1) {
   this.cm1 = cm1;
@@ -2516,32 +3184,16 @@ ImpactEstimator.prototype.getImpacts = function(subject, callback) {
   this.cm1.adapter().getImpacts(this.cm1, subject, this.params(subject),
                                 ImpactEstimator.callbacks.getImpacts(subject, callback));
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/impact-estimator.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/CM1/lib/adapters/http-adapter.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib/adapters";
-    var __filename = "/node_modules/CM1/lib/adapters/http-adapter.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib/adapters");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib/adapters");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/adapters/http-adapter.js"]._cached = module.exports;
-    
-    (function () {
-        var http = require('http');
+});
+
+require.define("/node_modules/CM1/lib/adapters/http-adapter.js", function (require, module, exports, __dirname, __filename) {
+var http = require('http'),
+    querystring = require('querystring'),
+    _ = require('underscore');
+
+if(typeof JSON == 'undefined')
+  JSON = require('JSON');
 
 var ImpactEstimate = require('../impact-estimate'),
     Util = require('../util');
@@ -2551,14 +3203,22 @@ var HttpAdapter = module.exports = function() {
 };
 
 HttpAdapter.prototype.path = function(cm1) {
-  return Util.pluralize(cm1.model) + '.json';
+  return '/' + Util.pluralize(cm1.model) + '.json';
 };
 
 HttpAdapter.prototype.getImpacts = function(cm1, subject, params, callback) {
+  var stringParams = _.reduce(params, function(obj, value, key) {
+    obj[key] = value.toString();
+    return obj;
+  }, {});
+  var body = querystring.stringify(stringParams);
   var req = http.request({
     host: this.host, port: 80, path: this.path(cm1),
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': body.length
+    }
   }, function (res) {
     var data = '';
     res.on('data', function (buf) {
@@ -2576,70 +3236,784 @@ HttpAdapter.prototype.getImpacts = function(cm1, subject, params, callback) {
       callback(null, subject.impacts);
     });
   });
-  req.end(JSON.stringify(params));
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/adapters/http-adapter.js"]._cached = module.exports;
-    return module.exports;
+  req.end(body);
 };
 
-require.modules["/node_modules/CM1/lib/util.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib";
-    var __filename = "/node_modules/CM1/lib/util.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib");
+});
+
+require.define("querystring", function (require, module, exports, __dirname, __filename) {
+var isArray = typeof Array.isArray === 'function'
+    ? Array.isArray
+    : function (xs) {
+        return Object.prototype.toString.call(xs) === '[object Array]'
     };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/util.js"]._cached = module.exports;
-    
-    (function () {
-        var Util = module.exports = {
+
+var objectKeys = Object.keys || function objectKeys(object) {
+    if (object !== Object(object)) throw new TypeError('Invalid object');
+    var keys = [];
+    for (var key in object) if (object.hasOwnProperty(key)) keys[keys.length] = key;
+    return keys;
+}
+
+
+/*!
+ * querystring
+ * Copyright(c) 2010 TJ Holowaychuk <tj@vision-media.ca>
+ * MIT Licensed
+ */
+
+/**
+ * Library version.
+ */
+
+exports.version = '0.3.1';
+
+/**
+ * Object#toString() ref for stringify().
+ */
+
+var toString = Object.prototype.toString;
+
+/**
+ * Cache non-integer test regexp.
+ */
+
+var notint = /[^0-9]/;
+
+/**
+ * Parse the given query `str`, returning an object.
+ *
+ * @param {String} str
+ * @return {Object}
+ * @api public
+ */
+
+exports.parse = function(str){
+  if (null == str || '' == str) return {};
+
+  function promote(parent, key) {
+    if (parent[key].length == 0) return parent[key] = {};
+    var t = {};
+    for (var i in parent[key]) t[i] = parent[key][i];
+    parent[key] = t;
+    return t;
+  }
+
+  return String(str)
+    .split('&')
+    .reduce(function(ret, pair){
+      try{ 
+        pair = decodeURIComponent(pair.replace(/\+/g, ' '));
+      } catch(e) {
+        // ignore
+      }
+
+      var eql = pair.indexOf('=')
+        , brace = lastBraceInKey(pair)
+        , key = pair.substr(0, brace || eql)
+        , val = pair.substr(brace || eql, pair.length)
+        , val = val.substr(val.indexOf('=') + 1, val.length)
+        , parent = ret;
+
+      // ?foo
+      if ('' == key) key = pair, val = '';
+
+      // nested
+      if (~key.indexOf(']')) {
+        var parts = key.split('[')
+          , len = parts.length
+          , last = len - 1;
+
+        function parse(parts, parent, key) {
+          var part = parts.shift();
+
+          // end
+          if (!part) {
+            if (isArray(parent[key])) {
+              parent[key].push(val);
+            } else if ('object' == typeof parent[key]) {
+              parent[key] = val;
+            } else if ('undefined' == typeof parent[key]) {
+              parent[key] = val;
+            } else {
+              parent[key] = [parent[key], val];
+            }
+          // array
+          } else {
+            obj = parent[key] = parent[key] || [];
+            if (']' == part) {
+              if (isArray(obj)) {
+                if ('' != val) obj.push(val);
+              } else if ('object' == typeof obj) {
+                obj[objectKeys(obj).length] = val;
+              } else {
+                obj = parent[key] = [parent[key], val];
+              }
+            // prop
+            } else if (~part.indexOf(']')) {
+              part = part.substr(0, part.length - 1);
+              if(notint.test(part) && isArray(obj)) obj = promote(parent, key);
+              parse(parts, obj, part);
+            // key
+            } else {
+              if(notint.test(part) && isArray(obj)) obj = promote(parent, key);
+              parse(parts, obj, part);
+            }
+          }
+        }
+
+        parse(parts, parent, 'base');
+      // optimize
+      } else {
+        if (notint.test(key) && isArray(parent.base)) {
+          var t = {};
+          for(var k in parent.base) t[k] = parent.base[k];
+          parent.base = t;
+        }
+        set(parent.base, key, val);
+      }
+
+      return ret;
+    }, {base: {}}).base;
+};
+
+/**
+ * Turn the given `obj` into a query string
+ *
+ * @param {Object} obj
+ * @return {String}
+ * @api public
+ */
+
+var stringify = exports.stringify = function(obj, prefix) {
+  if (isArray(obj)) {
+    return stringifyArray(obj, prefix);
+  } else if ('[object Object]' == toString.call(obj)) {
+    return stringifyObject(obj, prefix);
+  } else if ('string' == typeof obj) {
+    return stringifyString(obj, prefix);
+  } else {
+    return prefix;
+  }
+};
+
+/**
+ * Stringify the given `str`.
+ *
+ * @param {String} str
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyString(str, prefix) {
+  if (!prefix) throw new TypeError('stringify expects an object');
+  return prefix + '=' + encodeURIComponent(str);
+}
+
+/**
+ * Stringify the given `arr`.
+ *
+ * @param {Array} arr
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyArray(arr, prefix) {
+  var ret = [];
+  if (!prefix) throw new TypeError('stringify expects an object');
+  for (var i = 0; i < arr.length; i++) {
+    ret.push(stringify(arr[i], prefix + '[]'));
+  }
+  return ret.join('&');
+}
+
+/**
+ * Stringify the given `obj`.
+ *
+ * @param {Object} obj
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyObject(obj, prefix) {
+  var ret = []
+    , keys = objectKeys(obj)
+    , key;
+  for (var i = 0, len = keys.length; i < len; ++i) {
+    key = keys[i];
+    ret.push(stringify(obj[key], prefix
+      ? prefix + '[' + encodeURIComponent(key) + ']'
+      : encodeURIComponent(key)));
+  }
+  return ret.join('&');
+}
+
+/**
+ * Set `obj`'s `key` to `val` respecting
+ * the weird and wonderful syntax of a qs,
+ * where "foo=bar&foo=baz" becomes an array.
+ *
+ * @param {Object} obj
+ * @param {String} key
+ * @param {String} val
+ * @api private
+ */
+
+function set(obj, key, val) {
+  var v = obj[key];
+  if (undefined === v) {
+    obj[key] = val;
+  } else if (isArray(v)) {
+    v.push(val);
+  } else {
+    obj[key] = [v, val];
+  }
+}
+
+/**
+ * Locate last brace in `str` within the key.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function lastBraceInKey(str) {
+  var len = str.length
+    , brace
+    , c;
+  for (var i = 0; i < len; ++i) {
+    c = str[i];
+    if (']' == c) brace = false;
+    if ('[' == c) brace = true;
+    if ('=' == c && !brace) return i;
+  }
+}
+
+});
+
+require.define("/node_modules/JSON/package.json", function (require, module, exports, __dirname, __filename) {
+module.exports = {"main":"json2.js"}
+});
+
+require.define("/node_modules/JSON/json2.js", function (require, module, exports, __dirname, __filename) {
+/*
+    http://www.JSON.org/json2.js
+    2011-02-23
+
+    Public Domain.
+
+    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+
+    See http://www.JSON.org/js.html
+
+
+    This code should be minified before deployment.
+    See http://javascript.crockford.com/jsmin.html
+
+    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
+    NOT CONTROL.
+
+
+    This file creates a global JSON object containing two methods: stringify
+    and parse.
+
+        JSON.stringify(value, replacer, space)
+            value       any JavaScript value, usually an object or array.
+
+            replacer    an optional parameter that determines how object
+                        values are stringified for objects. It can be a
+                        function or an array of strings.
+
+            space       an optional parameter that specifies the indentation
+                        of nested structures. If it is omitted, the text will
+                        be packed without extra whitespace. If it is a number,
+                        it will specify the number of spaces to indent at each
+                        level. If it is a string (such as '\t' or '&nbsp;'),
+                        it contains the characters used to indent at each level.
+
+            This method produces a JSON text from a JavaScript value.
+
+            When an object value is found, if the object contains a toJSON
+            method, its toJSON method will be called and the result will be
+            stringified. A toJSON method does not serialize: it returns the
+            value represented by the name/value pair that should be serialized,
+            or undefined if nothing should be serialized. The toJSON method
+            will be passed the key associated with the value, and this will be
+            bound to the value
+
+            For example, this would serialize Dates as ISO strings.
+
+                Date.prototype.toJSON = function (key) {
+                    function f(n) {
+                        // Format integers to have at least two digits.
+                        return n < 10 ? '0' + n : n;
+                    }
+
+                    return this.getUTCFullYear()   + '-' +
+                         f(this.getUTCMonth() + 1) + '-' +
+                         f(this.getUTCDate())      + 'T' +
+                         f(this.getUTCHours())     + ':' +
+                         f(this.getUTCMinutes())   + ':' +
+                         f(this.getUTCSeconds())   + 'Z';
+                };
+
+            You can provide an optional replacer method. It will be passed the
+            key and value of each member, with this bound to the containing
+            object. The value that is returned from your method will be
+            serialized. If your method returns undefined, then the member will
+            be excluded from the serialization.
+
+            If the replacer parameter is an array of strings, then it will be
+            used to select the members to be serialized. It filters the results
+            such that only members with keys listed in the replacer array are
+            stringified.
+
+            Values that do not have JSON representations, such as undefined or
+            functions, will not be serialized. Such values in objects will be
+            dropped; in arrays they will be replaced with null. You can use
+            a replacer function to replace those with JSON values.
+            JSON.stringify(undefined) returns undefined.
+
+            The optional space parameter produces a stringification of the
+            value that is filled with line breaks and indentation to make it
+            easier to read.
+
+            If the space parameter is a non-empty string, then that string will
+            be used for indentation. If the space parameter is a number, then
+            the indentation will be that many spaces.
+
+            Example:
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}]);
+            // text is '["e",{"pluribus":"unum"}]'
+
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
+            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
+
+            text = JSON.stringify([new Date()], function (key, value) {
+                return this[key] instanceof Date ?
+                    'Date(' + this[key] + ')' : value;
+            });
+            // text is '["Date(---current time---)"]'
+
+
+        JSON.parse(text, reviver)
+            This method parses a JSON text to produce an object or array.
+            It can throw a SyntaxError exception.
+
+            The optional reviver parameter is a function that can filter and
+            transform the results. It receives each of the keys and values,
+            and its return value is used instead of the original value.
+            If it returns what it received, then the structure is not modified.
+            If it returns undefined then the member is deleted.
+
+            Example:
+
+            // Parse the text. Values that look like ISO date strings will
+            // be converted to Date objects.
+
+            myData = JSON.parse(text, function (key, value) {
+                var a;
+                if (typeof value === 'string') {
+                    a =
+/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                    if (a) {
+                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
+                            +a[5], +a[6]));
+                    }
+                }
+                return value;
+            });
+
+            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
+                var d;
+                if (typeof value === 'string' &&
+                        value.slice(0, 5) === 'Date(' &&
+                        value.slice(-1) === ')') {
+                    d = new Date(value.slice(5, -1));
+                    if (d) {
+                        return d;
+                    }
+                }
+                return value;
+            });
+
+
+    This is a reference implementation. You are free to copy, modify, or
+    redistribute.
+*/
+
+/*jslint evil: true, strict: false, regexp: false */
+
+/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
+    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
+    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
+    lastIndex, length, parse, prototype, push, replace, slice, stringify,
+    test, toJSON, toString, valueOf
+*/
+
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
+
+var JSON;
+if (!JSON) {
+    JSON = {};
+}
+
+(function () {
+    "use strict";
+
+    var global = Function('return this')()
+      , JSON = global.JSON
+      ;
+
+    if (!JSON) {
+      JSON = {};
+    }
+
+    function f(n) {
+        // Format integers to have at least two digits.
+        return n < 10 ? '0' + n : n;
+    }
+
+    if (typeof Date.prototype.toJSON !== 'function') {
+
+        Date.prototype.toJSON = function (key) {
+
+            return isFinite(this.valueOf()) ?
+                this.getUTCFullYear()     + '-' +
+                f(this.getUTCMonth() + 1) + '-' +
+                f(this.getUTCDate())      + 'T' +
+                f(this.getUTCHours())     + ':' +
+                f(this.getUTCMinutes())   + ':' +
+                f(this.getUTCSeconds())   + 'Z' : null;
+        };
+
+        String.prototype.toJSON      =
+            Number.prototype.toJSON  =
+            Boolean.prototype.toJSON = function (key) {
+                return this.valueOf();
+            };
+    }
+
+    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        gap,
+        indent,
+        meta = {    // table of character substitutions
+            '\b': '\\b',
+            '\t': '\\t',
+            '\n': '\\n',
+            '\f': '\\f',
+            '\r': '\\r',
+            '"' : '\\"',
+            '\\': '\\\\'
+        },
+        rep;
+
+
+    function quote(string) {
+
+// If the string contains no control characters, no quote characters, and no
+// backslash characters, then we can safely slap some quotes around it.
+// Otherwise we must also replace the offending characters with safe escape
+// sequences.
+
+        escapable.lastIndex = 0;
+        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+            var c = meta[a];
+            return typeof c === 'string' ? c :
+                '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }) + '"' : '"' + string + '"';
+    }
+
+
+    function str(key, holder) {
+
+// Produce a string from holder[key].
+
+        var i,          // The loop counter.
+            k,          // The member key.
+            v,          // The member value.
+            length,
+            mind = gap,
+            partial,
+            value = holder[key];
+
+// If the value has a toJSON method, call it to obtain a replacement value.
+
+        if (value && typeof value === 'object' &&
+                typeof value.toJSON === 'function') {
+            value = value.toJSON(key);
+        }
+
+// If we were called with a replacer function, then call the replacer to
+// obtain a replacement value.
+
+        if (typeof rep === 'function') {
+            value = rep.call(holder, key, value);
+        }
+
+// What happens next depends on the value's type.
+
+        switch (typeof value) {
+        case 'string':
+            return quote(value);
+
+        case 'number':
+
+// JSON numbers must be finite. Encode non-finite numbers as null.
+
+            return isFinite(value) ? String(value) : 'null';
+
+        case 'boolean':
+        case 'null':
+
+// If the value is a boolean or null, convert it to a string. Note:
+// typeof null does not produce 'null'. The case is included here in
+// the remote chance that this gets fixed someday.
+
+            return String(value);
+
+// If the type is 'object', we might be dealing with an object or an array or
+// null.
+
+        case 'object':
+
+// Due to a specification blunder in ECMAScript, typeof null is 'object',
+// so watch out for that case.
+
+            if (!value) {
+                return 'null';
+            }
+
+// Make an array to hold the partial results of stringifying this object value.
+
+            gap += indent;
+            partial = [];
+
+// Is the value an array?
+
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+
+// The value is an array. Stringify every element. Use null as a placeholder
+// for non-JSON values.
+
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
+                }
+
+// Join all of the elements together, separated with commas, and wrap them in
+// brackets.
+
+                v = partial.length === 0 ? '[]' : gap ?
+                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
+                    '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
+            }
+
+// If the replacer is an array, use it to select the members to be stringified.
+
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    if (typeof rep[i] === 'string') {
+                        k = rep[i];
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            } else {
+
+// Otherwise, iterate through all of the keys in the object.
+
+                for (k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+
+// Join all of the member texts together, separated with commas,
+// and wrap them in braces.
+
+            v = partial.length === 0 ? '{}' : gap ?
+                '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
+                '{' + partial.join(',') + '}';
+            gap = mind;
+            return v;
+        }
+    }
+
+// If the JSON object does not yet have a stringify method, give it one.
+
+    if (typeof JSON.stringify !== 'function') {
+        JSON.stringify = function (value, replacer, space) {
+
+// The stringify method takes a value and an optional replacer, and an optional
+// space parameter, and returns a JSON text. The replacer can be a function
+// that can replace values, or an array of strings that will select the keys.
+// A default replacer method can be provided. Use of the space parameter can
+// produce text that is more easily readable.
+
+            var i;
+            gap = '';
+            indent = '';
+
+// If the space parameter is a number, make an indent string containing that
+// many spaces.
+
+            if (typeof space === 'number') {
+                for (i = 0; i < space; i += 1) {
+                    indent += ' ';
+                }
+
+// If the space parameter is a string, it will be used as the indent string.
+
+            } else if (typeof space === 'string') {
+                indent = space;
+            }
+
+// If there is a replacer, it must be a function or an array.
+// Otherwise, throw an error.
+
+            rep = replacer;
+            if (replacer && typeof replacer !== 'function' &&
+                    (typeof replacer !== 'object' ||
+                    typeof replacer.length !== 'number')) {
+                throw new Error('JSON.stringify');
+            }
+
+// Make a fake root object containing our value under the key of ''.
+// Return the result of stringifying the value.
+
+            return str('', {'': value});
+        };
+    }
+
+
+// If the JSON object does not yet have a parse method, give it one.
+
+    if (typeof JSON.parse !== 'function') {
+        JSON.parse = function (text, reviver) {
+
+// The parse method takes a text and an optional reviver function, and returns
+// a JavaScript value if the text is a valid JSON text.
+
+            var j;
+
+            function walk(holder, key) {
+
+// The walk method is used to recursively walk the resulting structure so
+// that modifications can be made.
+
+                var k, v, value = holder[key];
+                if (value && typeof value === 'object') {
+                    for (k in value) {
+                        if (Object.prototype.hasOwnProperty.call(value, k)) {
+                            v = walk(value, k);
+                            if (v !== undefined) {
+                                value[k] = v;
+                            } else {
+                                delete value[k];
+                            }
+                        }
+                    }
+                }
+                return reviver.call(holder, key, value);
+            }
+
+
+// Parsing happens in four stages. In the first stage, we replace certain
+// Unicode characters with escape sequences. JavaScript handles many characters
+// incorrectly, either silently deleting them, or treating them as line endings.
+
+            text = String(text);
+            cx.lastIndex = 0;
+            if (cx.test(text)) {
+                text = text.replace(cx, function (a) {
+                    return '\\u' +
+                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+                });
+            }
+
+// In the second stage, we run the text against regular expressions that look
+// for non-JSON patterns. We are especially concerned with '()' and 'new'
+// because they can cause invocation, and '=' because it can cause mutation.
+// But just to be safe, we want to reject all unexpected forms.
+
+// We split the second stage into 4 regexp operations in order to work around
+// crippling inefficiencies in IE's and Safari's regexp engines. First we
+// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
+// replace all simple value tokens with ']' characters. Third, we delete all
+// open brackets that follow a colon or comma or that begin the text. Finally,
+// we look to see that the remaining characters are only whitespace or ']' or
+// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
+
+            if (/^[\],:{}\s]*$/
+                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+
+// In the third stage we use the eval function to compile the text into a
+// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
+// in JavaScript: it can begin a block or an object literal. We wrap the text
+// in parens to eliminate the ambiguity.
+
+                j = eval('(' + text + ')');
+
+// In the optional fourth stage, we recursively walk the new structure, passing
+// each name/value pair to a reviver function for possible transformation.
+
+                return typeof reviver === 'function' ?
+                    walk({'': j}, '') : j;
+            }
+
+// If the text is not JSON parseable, then a SyntaxError is thrown.
+
+            throw new SyntaxError('JSON.parse');
+        };
+    }
+
+    global.JSON = JSON;
+    module.exports = JSON;
+}());
+
+});
+
+require.define("/node_modules/CM1/lib/util.js", function (require, module, exports, __dirname, __filename) {
+var Util = module.exports = {
   pluralize: function(str) {
     return str + 's';
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/util.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/CM1/lib/adapters/websocket-adapter.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/CM1/lib/adapters";
-    var __filename = "/node_modules/CM1/lib/adapters/websocket-adapter.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/CM1/lib/adapters");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/CM1/lib/adapters");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/CM1/lib/adapters/websocket-adapter.js"]._cached = module.exports;
-    
-    (function () {
-        var io = require('socket.io-client');
+});
+
+require.define("/node_modules/CM1/lib/adapters/websocket-adapter.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('../cm1');
 
 var ImpactEstimate = require('../impact-estimate'),
     Util = require('../util');
 
 var WebsocketAdapter = module.exports = function() {
-  this.host = CM1.websocketHost || 'push-brighterplanet.no.de';
+  process.env = process.env || {};
+  var hostname = process.env.CM1_WEBSOCKET_HOST || CM1.websocketHost || 'push-brighterplanet.no.de:80';
+  if(!/^http:/.test(hostname)) hostname = 'http://' + hostname;
+  this.host = hostname;
 };
 
 WebsocketAdapter.callbacks = {
@@ -2657,7 +4031,8 @@ WebsocketAdapter.callbacks = {
 };
 
 WebsocketAdapter.prototype.connect = function() {
-  this.socket = io.connect();
+  var socketIo = 'socket.io-client';
+  this.socket = require(socketIo).connect(this.host);
 };
 
 WebsocketAdapter.prototype.getImpacts = function(cm1, subject, params, callback) {
@@ -2669,3900 +4044,31 @@ WebsocketAdapter.prototype.getImpacts = function(cm1, subject, params, callback)
   this.socket.emit('impacts', request,
                    WebsocketAdapter.callbacks.getImpacts(subject, callback));
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/CM1/lib/adapters/websocket-adapter.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/node_modules/socket.io-client/package.json"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/socket.io-client";
-    var __filename = "/node_modules/socket.io-client/package.json";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/socket.io-client");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/socket.io-client");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/socket.io-client/package.json"]._cached = module.exports;
-    
-    (function () {
-        module.exports = {"name":"socket.io-client","description":"Socket.IO client for the browser and node.js","version":"0.8.7","main":"./lib/io.js","browserify":"./dist/socket.io.js","homepage":"http://socket.io","keywords":["websocket","socket","realtime","socket.io","comet","ajax"],"author":"Guillermo Rauch <guillermo@learnboost.com>","contributors":[{"name":"Guillermo Rauch","email":"rauchg@gmail.com"},{"name":"Arnout Kazemier","email":"info@3rd-eden.com"},{"name":"Vladimir Dronnikov","email":"dronnikov@gmail.com"},{"name":"Einar Otto Stangvik","email":"einaros@gmail.com"}],"repository":{"type":"git","url":"https://github.com/LearnBoost/socket.io-client.git"},"dependencies":{"uglify-js":"1.0.6","websocket-client":"1.0.0","xmlhttprequest":"1.2.2"},"devDependencies":{"expresso":"0.7.7","express":"2.3.11","jade":"0.12.1","stylus":"0.13.3","socket.io":"0.8.7","socket.io-client":"0.8.7"},"engines":{"node":">= 0.4.0"}};
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/socket.io-client/package.json"]._cached = module.exports;
-    return module.exports;
-};
+});
 
-require.modules["/node_modules/socket.io-client/dist/socket.io.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/node_modules/socket.io-client/dist";
-    var __filename = "/node_modules/socket.io-client/dist/socket.io.js";
-    
-    var require = function (file) {
-        return __require(file, "/node_modules/socket.io-client/dist");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/node_modules/socket.io-client/dist");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/node_modules/socket.io-client/dist/socket.io.js"]._cached = module.exports;
-    
-    (function () {
-        /*! Socket.IO.js build:0.8.7, development. Copyright(c) 2011 LearnBoost <dev@learnboost.com> MIT Licensed */
+require.define("/lib/segment.js", function (require, module, exports, __dirname, __filename) {
+var Segment = function() {};
 
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, global) {
-
-  /**
-   * IO namespace.
-   *
-   * @namespace
-   */
-
-  var io = exports;
-
-  /**
-   * Socket.IO version
-   *
-   * @api public
-   */
-
-  io.version = '0.8.7';
-
-  /**
-   * Protocol implemented.
-   *
-   * @api public
-   */
-
-  io.protocol = 1;
-
-  /**
-   * Available transports, these will be populated with the available transports
-   *
-   * @api public
-   */
-
-  io.transports = [];
-
-  /**
-   * Keep track of jsonp callbacks.
-   *
-   * @api private
-   */
-
-  io.j = [];
-
-  /**
-   * Keep track of our io.Sockets
-   *
-   * @api private
-   */
-  io.sockets = {};
-
-
-  /**
-   * Manages connections to hosts.
-   *
-   * @param {String} uri
-   * @Param {Boolean} force creation of new socket (defaults to false)
-   * @api public
-   */
-
-  io.connect = function (host, details) {
-    var uri = io.util.parseUri(host)
-      , uuri
-      , socket;
-
-    if (global && global.location) {
-      uri.protocol = uri.protocol || global.location.protocol.slice(0, -1);
-      uri.host = uri.host || (global.document
-        ? global.document.domain : global.location.hostname);
-      uri.port = uri.port || global.location.port;
-    }
-
-    uuri = io.util.uniqueUri(uri);
-
-    var options = {
-        host: uri.host
-      , secure: 'https' == uri.protocol
-      , port: uri.port || ('https' == uri.protocol ? 443 : 80)
-      , query: uri.query || ''
-    };
-
-    io.util.merge(options, details);
-
-    if (options['force new connection'] || !io.sockets[uuri]) {
-      socket = new io.Socket(options);
-    }
-
-    if (!options['force new connection'] && socket) {
-      io.sockets[uuri] = socket;
-    }
-
-    socket = socket || io.sockets[uuri];
-
-    // if path is different from '' or /
-    return socket.of(uri.path.length > 1 ? uri.path : '');
-  };
-
-})('object' === typeof module ? module.exports : (this.io = {}), this);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, global) {
-
-  /**
-   * Utilities namespace.
-   *
-   * @namespace
-   */
-
-  var util = exports.util = {};
-
-  /**
-   * Parses an URI
-   *
-   * @author Steven Levithan <stevenlevithan.com> (MIT license)
-   * @api public
-   */
-
-  var re = /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
-
-  var parts = ['source', 'protocol', 'authority', 'userInfo', 'user', 'password',
-               'host', 'port', 'relative', 'path', 'directory', 'file', 'query',
-               'anchor'];
-
-  util.parseUri = function (str) {
-    var m = re.exec(str || '')
-      , uri = {}
-      , i = 14;
-
-    while (i--) {
-      uri[parts[i]] = m[i] || '';
-    }
-
-    return uri;
-  };
-
-  /**
-   * Produces a unique url that identifies a Socket.IO connection.
-   *
-   * @param {Object} uri
-   * @api public
-   */
-
-  util.uniqueUri = function (uri) {
-    var protocol = uri.protocol
-      , host = uri.host
-      , port = uri.port;
-
-    if ('document' in global) {
-      host = host || document.domain;
-      port = port || (protocol == 'https'
-        && document.location.protocol !== 'https:' ? 443 : document.location.port);
-    } else {
-      host = host || 'localhost';
-
-      if (!port && protocol == 'https') {
-        port = 443;
-      }
-    }
-
-    return (protocol || 'http') + '://' + host + ':' + (port || 80);
-  };
-
-  /**
-   * Mergest 2 query strings in to once unique query string
-   *
-   * @param {String} base
-   * @param {String} addition
-   * @api public
-   */
-
-  util.query = function (base, addition) {
-    var query = util.chunkQuery(base || '')
-      , components = [];
-
-    util.merge(query, util.chunkQuery(addition || ''));
-    for (var part in query) {
-      if (query.hasOwnProperty(part)) {
-        components.push(part + '=' + query[part]);
-      }
-    }
-
-    return components.length ? '?' + components.join('&') : '';
-  };
-
-  /**
-   * Transforms a querystring in to an object
-   *
-   * @param {String} qs
-   * @api public
-   */
-
-  util.chunkQuery = function (qs) {
-    var query = {}
-      , params = qs.split('&')
-      , i = 0
-      , l = params.length
-      , kv;
-
-    for (; i < l; ++i) {
-      kv = params[i].split('=');
-      if (kv[0]) {
-        query[kv[0]] = decodeURIComponent(kv[1]);
-      }
-    }
-
-    return query;
-  };
-
-  /**
-   * Executes the given function when the page is loaded.
-   *
-   *     io.util.load(function () { console.log('page loaded'); });
-   *
-   * @param {Function} fn
-   * @api public
-   */
-
-  var pageLoaded = false;
-
-  util.load = function (fn) {
-    if ('document' in global && document.readyState === 'complete' || pageLoaded) {
-      return fn();
-    }
-
-    util.on(global, 'load', fn, false);
-  };
-
-  /**
-   * Adds an event.
-   *
-   * @api private
-   */
-
-  util.on = function (element, event, fn, capture) {
-    if (element.attachEvent) {
-      element.attachEvent('on' + event, fn);
-    } else if (element.addEventListener) {
-      element.addEventListener(event, fn, capture);
-    }
-  };
-
-  /**
-   * Generates the correct `XMLHttpRequest` for regular and cross domain requests.
-   *
-   * @param {Boolean} [xdomain] Create a request that can be used cross domain.
-   * @returns {XMLHttpRequest|false} If we can create a XMLHttpRequest.
-   * @api private
-   */
-
-  util.request = function (xdomain) {
-
-    if (xdomain && 'undefined' != typeof XDomainRequest) {
-      return new XDomainRequest();
-    }
-
-    if ('undefined' != typeof XMLHttpRequest && (!xdomain || util.ua.hasCORS)) {
-      return new XMLHttpRequest();
-    }
-
-    if (!xdomain) {
-      try {
-        return new ActiveXObject('Microsoft.XMLHTTP');
-      } catch(e) { }
-    }
-
-    return null;
-  };
-
-  /**
-   * XHR based transport constructor.
-   *
-   * @constructor
-   * @api public
-   */
-
-  /**
-   * Change the internal pageLoaded value.
-   */
-
-  if ('undefined' != typeof window) {
-    util.load(function () {
-      pageLoaded = true;
-    });
-  }
-
-  /**
-   * Defers a function to ensure a spinner is not displayed by the browser
-   *
-   * @param {Function} fn
-   * @api public
-   */
-
-  util.defer = function (fn) {
-    if (!util.ua.webkit || 'undefined' != typeof importScripts) {
-      return fn();
-    }
-
-    util.load(function () {
-      setTimeout(fn, 100);
-    });
-  };
-
-  /**
-   * Merges two objects.
-   *
-   * @api public
-   */
-  
-  util.merge = function merge (target, additional, deep, lastseen) {
-    var seen = lastseen || []
-      , depth = typeof deep == 'undefined' ? 2 : deep
-      , prop;
-
-    for (prop in additional) {
-      if (additional.hasOwnProperty(prop) && util.indexOf(seen, prop) < 0) {
-        if (typeof target[prop] !== 'object' || !depth) {
-          target[prop] = additional[prop];
-          seen.push(additional[prop]);
-        } else {
-          util.merge(target[prop], additional[prop], depth - 1, seen);
-        }
-      }
-    }
-
-    return target;
-  };
-
-  /**
-   * Merges prototypes from objects
-   *
-   * @api public
-   */
-  
-  util.mixin = function (ctor, ctor2) {
-    util.merge(ctor.prototype, ctor2.prototype);
-  };
-
-  /**
-   * Shortcut for prototypical and static inheritance.
-   *
-   * @api private
-   */
-
-  util.inherit = function (ctor, ctor2) {
-    function f() {};
-    f.prototype = ctor2.prototype;
-    ctor.prototype = new f;
-  };
-
-  /**
-   * Checks if the given object is an Array.
-   *
-   *     io.util.isArray([]); // true
-   *     io.util.isArray({}); // false
-   *
-   * @param Object obj
-   * @api public
-   */
-
-  util.isArray = Array.isArray || function (obj) {
-    return Object.prototype.toString.call(obj) === '[object Array]';
-  };
-
-  /**
-   * Intersects values of two arrays into a third
-   *
-   * @api public
-   */
-
-  util.intersect = function (arr, arr2) {
-    var ret = []
-      , longest = arr.length > arr2.length ? arr : arr2
-      , shortest = arr.length > arr2.length ? arr2 : arr;
-
-    for (var i = 0, l = shortest.length; i < l; i++) {
-      if (~util.indexOf(longest, shortest[i]))
-        ret.push(shortest[i]);
-    }
-
-    return ret;
-  }
-
-  /**
-   * Array indexOf compatibility.
-   *
-   * @see bit.ly/a5Dxa2
-   * @api public
-   */
-
-  util.indexOf = function (arr, o, i) {
-    if (Array.prototype.indexOf) {
-      return Array.prototype.indexOf.call(arr, o, i);
-    }
-
-    for (var j = arr.length, i = i < 0 ? i + j < 0 ? 0 : i + j : i || 0; 
-         i < j && arr[i] !== o; i++) {}
-
-    return j <= i ? -1 : i;
-  };
-
-  /**
-   * Converts enumerables to array.
-   *
-   * @api public
-   */
-
-  util.toArray = function (enu) {
-    var arr = [];
-
-    for (var i = 0, l = enu.length; i < l; i++)
-      arr.push(enu[i]);
-
-    return arr;
-  };
-
-  /**
-   * UA / engines detection namespace.
-   *
-   * @namespace
-   */
-
-  util.ua = {};
-
-  /**
-   * Whether the UA supports CORS for XHR.
-   *
-   * @api public
-   */
-
-  util.ua.hasCORS = 'undefined' != typeof XMLHttpRequest && (function () {
-    try {
-      var a = new XMLHttpRequest();
-    } catch (e) {
-      return false;
-    }
-
-    return a.withCredentials != undefined;
-  })();
-
-  /**
-   * Detect webkit.
-   *
-   * @api public
-   */
-
-  util.ua.webkit = 'undefined' != typeof navigator
-    && /webkit/i.test(navigator.userAgent);
-
-})('undefined' != typeof io ? io : module.exports, this);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.EventEmitter = EventEmitter;
-
-  /**
-   * Event emitter constructor.
-   *
-   * @api public.
-   */
-
-  function EventEmitter () {};
-
-  /**
-   * Adds a listener
-   *
-   * @api public
-   */
-
-  EventEmitter.prototype.on = function (name, fn) {
-    if (!this.$events) {
-      this.$events = {};
-    }
-
-    if (!this.$events[name]) {
-      this.$events[name] = fn;
-    } else if (io.util.isArray(this.$events[name])) {
-      this.$events[name].push(fn);
-    } else {
-      this.$events[name] = [this.$events[name], fn];
-    }
-
-    return this;
-  };
-
-  EventEmitter.prototype.addListener = EventEmitter.prototype.on;
-
-  /**
-   * Adds a volatile listener.
-   *
-   * @api public
-   */
-
-  EventEmitter.prototype.once = function (name, fn) {
-    var self = this;
-
-    function on () {
-      self.removeListener(name, on);
-      fn.apply(this, arguments);
-    };
-
-    on.listener = fn;
-    this.on(name, on);
-
-    return this;
-  };
-
-  /**
-   * Removes a listener.
-   *
-   * @api public
-   */
-
-  EventEmitter.prototype.removeListener = function (name, fn) {
-    if (this.$events && this.$events[name]) {
-      var list = this.$events[name];
-
-      if (io.util.isArray(list)) {
-        var pos = -1;
-
-        for (var i = 0, l = list.length; i < l; i++) {
-          if (list[i] === fn || (list[i].listener && list[i].listener === fn)) {
-            pos = i;
-            break;
-          }
-        }
-
-        if (pos < 0) {
-          return this;
-        }
-
-        list.splice(pos, 1);
-
-        if (!list.length) {
-          delete this.$events[name];
-        }
-      } else if (list === fn || (list.listener && list.listener === fn)) {
-        delete this.$events[name];
-      }
-    }
-
-    return this;
-  };
-
-  /**
-   * Removes all listeners for an event.
-   *
-   * @api public
-   */
-
-  EventEmitter.prototype.removeAllListeners = function (name) {
-    // TODO: enable this when node 0.5 is stable
-    //if (name === undefined) {
-      //this.$events = {};
-      //return this;
-    //}
-
-    if (this.$events && this.$events[name]) {
-      this.$events[name] = null;
-    }
-
-    return this;
-  };
-
-  /**
-   * Gets all listeners for a certain event.
-   *
-   * @api publci
-   */
-
-  EventEmitter.prototype.listeners = function (name) {
-    if (!this.$events) {
-      this.$events = {};
-    }
-
-    if (!this.$events[name]) {
-      this.$events[name] = [];
-    }
-
-    if (!io.util.isArray(this.$events[name])) {
-      this.$events[name] = [this.$events[name]];
-    }
-
-    return this.$events[name];
-  };
-
-  /**
-   * Emits an event.
-   *
-   * @api public
-   */
-
-  EventEmitter.prototype.emit = function (name) {
-    if (!this.$events) {
-      return false;
-    }
-
-    var handler = this.$events[name];
-
-    if (!handler) {
-      return false;
-    }
-
-    var args = Array.prototype.slice.call(arguments, 1);
-
-    if ('function' == typeof handler) {
-      handler.apply(this, args);
-    } else if (io.util.isArray(handler)) {
-      var listeners = handler.slice();
-
-      for (var i = 0, l = listeners.length; i < l; i++) {
-        listeners[i].apply(this, args);
-      }
-    } else {
-      return false;
-    }
-
-    return true;
-  };
-
-})(
-    'undefined' != typeof io ? io : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-/**
- * Based on JSON2 (http://www.JSON.org/js.html).
- */
-
-(function (exports, nativeJSON) {
-  "use strict";
-
-  // use native JSON if it's available
-  if (nativeJSON && nativeJSON.parse){
-    return exports.JSON = {
-      parse: nativeJSON.parse
-    , stringify: nativeJSON.stringify
-    }
-  }
-
-  var JSON = exports.JSON = {};
-
-  function f(n) {
-      // Format integers to have at least two digits.
-      return n < 10 ? '0' + n : n;
-  }
-
-  function date(d, key) {
-    return isFinite(d.valueOf()) ?
-        d.getUTCFullYear()     + '-' +
-        f(d.getUTCMonth() + 1) + '-' +
-        f(d.getUTCDate())      + 'T' +
-        f(d.getUTCHours())     + ':' +
-        f(d.getUTCMinutes())   + ':' +
-        f(d.getUTCSeconds())   + 'Z' : null;
-  };
-
-  var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-      escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-      gap,
-      indent,
-      meta = {    // table of character substitutions
-          '\b': '\\b',
-          '\t': '\\t',
-          '\n': '\\n',
-          '\f': '\\f',
-          '\r': '\\r',
-          '"' : '\\"',
-          '\\': '\\\\'
-      },
-      rep;
-
-
-  function quote(string) {
-
-// If the string contains no control characters, no quote characters, and no
-// backslash characters, then we can safely slap some quotes around it.
-// Otherwise we must also replace the offending characters with safe escape
-// sequences.
-
-      escapable.lastIndex = 0;
-      return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
-          var c = meta[a];
-          return typeof c === 'string' ? c :
-              '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-      }) + '"' : '"' + string + '"';
-  }
-
-
-  function str(key, holder) {
-
-// Produce a string from holder[key].
-
-      var i,          // The loop counter.
-          k,          // The member key.
-          v,          // The member value.
-          length,
-          mind = gap,
-          partial,
-          value = holder[key];
-
-// If the value has a toJSON method, call it to obtain a replacement value.
-
-      if (value instanceof Date) {
-          value = date(key);
-      }
-
-// If we were called with a replacer function, then call the replacer to
-// obtain a replacement value.
-
-      if (typeof rep === 'function') {
-          value = rep.call(holder, key, value);
-      }
-
-// What happens next depends on the value's type.
-
-      switch (typeof value) {
-      case 'string':
-          return quote(value);
-
-      case 'number':
-
-// JSON numbers must be finite. Encode non-finite numbers as null.
-
-          return isFinite(value) ? String(value) : 'null';
-
-      case 'boolean':
-      case 'null':
-
-// If the value is a boolean or null, convert it to a string. Note:
-// typeof null does not produce 'null'. The case is included here in
-// the remote chance that this gets fixed someday.
-
-          return String(value);
-
-// If the type is 'object', we might be dealing with an object or an array or
-// null.
-
-      case 'object':
-
-// Due to a specification blunder in ECMAScript, typeof null is 'object',
-// so watch out for that case.
-
-          if (!value) {
-              return 'null';
-          }
-
-// Make an array to hold the partial results of stringifying this object value.
-
-          gap += indent;
-          partial = [];
-
-// Is the value an array?
-
-          if (Object.prototype.toString.apply(value) === '[object Array]') {
-
-// The value is an array. Stringify every element. Use null as a placeholder
-// for non-JSON values.
-
-              length = value.length;
-              for (i = 0; i < length; i += 1) {
-                  partial[i] = str(i, value) || 'null';
-              }
-
-// Join all of the elements together, separated with commas, and wrap them in
-// brackets.
-
-              v = partial.length === 0 ? '[]' : gap ?
-                  '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
-                  '[' + partial.join(',') + ']';
-              gap = mind;
-              return v;
-          }
-
-// If the replacer is an array, use it to select the members to be stringified.
-
-          if (rep && typeof rep === 'object') {
-              length = rep.length;
-              for (i = 0; i < length; i += 1) {
-                  if (typeof rep[i] === 'string') {
-                      k = rep[i];
-                      v = str(k, value);
-                      if (v) {
-                          partial.push(quote(k) + (gap ? ': ' : ':') + v);
-                      }
-                  }
-              }
-          } else {
-
-// Otherwise, iterate through all of the keys in the object.
-
-              for (k in value) {
-                  if (Object.prototype.hasOwnProperty.call(value, k)) {
-                      v = str(k, value);
-                      if (v) {
-                          partial.push(quote(k) + (gap ? ': ' : ':') + v);
-                      }
-                  }
-              }
-          }
-
-// Join all of the member texts together, separated with commas,
-// and wrap them in braces.
-
-          v = partial.length === 0 ? '{}' : gap ?
-              '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
-              '{' + partial.join(',') + '}';
-          gap = mind;
-          return v;
-      }
-  }
-
-// If the JSON object does not yet have a stringify method, give it one.
-
-  JSON.stringify = function (value, replacer, space) {
-
-// The stringify method takes a value and an optional replacer, and an optional
-// space parameter, and returns a JSON text. The replacer can be a function
-// that can replace values, or an array of strings that will select the keys.
-// A default replacer method can be provided. Use of the space parameter can
-// produce text that is more easily readable.
-
-      var i;
-      gap = '';
-      indent = '';
-
-// If the space parameter is a number, make an indent string containing that
-// many spaces.
-
-      if (typeof space === 'number') {
-          for (i = 0; i < space; i += 1) {
-              indent += ' ';
-          }
-
-// If the space parameter is a string, it will be used as the indent string.
-
-      } else if (typeof space === 'string') {
-          indent = space;
-      }
-
-// If there is a replacer, it must be a function or an array.
-// Otherwise, throw an error.
-
-      rep = replacer;
-      if (replacer && typeof replacer !== 'function' &&
-              (typeof replacer !== 'object' ||
-              typeof replacer.length !== 'number')) {
-          throw new Error('JSON.stringify');
-      }
-
-// Make a fake root object containing our value under the key of ''.
-// Return the result of stringifying the value.
-
-      return str('', {'': value});
-  };
-
-// If the JSON object does not yet have a parse method, give it one.
-
-  JSON.parse = function (text, reviver) {
-  // The parse method takes a text and an optional reviver function, and returns
-  // a JavaScript value if the text is a valid JSON text.
-
-      var j;
-
-      function walk(holder, key) {
-
-  // The walk method is used to recursively walk the resulting structure so
-  // that modifications can be made.
-
-          var k, v, value = holder[key];
-          if (value && typeof value === 'object') {
-              for (k in value) {
-                  if (Object.prototype.hasOwnProperty.call(value, k)) {
-                      v = walk(value, k);
-                      if (v !== undefined) {
-                          value[k] = v;
-                      } else {
-                          delete value[k];
-                      }
-                  }
-              }
-          }
-          return reviver.call(holder, key, value);
-      }
-
-
-  // Parsing happens in four stages. In the first stage, we replace certain
-  // Unicode characters with escape sequences. JavaScript handles many characters
-  // incorrectly, either silently deleting them, or treating them as line endings.
-
-      text = String(text);
-      cx.lastIndex = 0;
-      if (cx.test(text)) {
-          text = text.replace(cx, function (a) {
-              return '\\u' +
-                  ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-          });
-      }
-
-  // In the second stage, we run the text against regular expressions that look
-  // for non-JSON patterns. We are especially concerned with '()' and 'new'
-  // because they can cause invocation, and '=' because it can cause mutation.
-  // But just to be safe, we want to reject all unexpected forms.
-
-  // We split the second stage into 4 regexp operations in order to work around
-  // crippling inefficiencies in IE's and Safari's regexp engines. First we
-  // replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
-  // replace all simple value tokens with ']' characters. Third, we delete all
-  // open brackets that follow a colon or comma or that begin the text. Finally,
-  // we look to see that the remaining characters are only whitespace or ']' or
-  // ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
-
-      if (/^[\],:{}\s]*$/
-              .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
-                  .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
-                  .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
-
-  // In the third stage we use the eval function to compile the text into a
-  // JavaScript structure. The '{' operator is subject to a syntactic ambiguity
-  // in JavaScript: it can begin a block or an object literal. We wrap the text
-  // in parens to eliminate the ambiguity.
-
-          j = eval('(' + text + ')');
-
-  // In the optional fourth stage, we recursively walk the new structure, passing
-  // each name/value pair to a reviver function for possible transformation.
-
-          return typeof reviver === 'function' ?
-              walk({'': j}, '') : j;
-      }
-
-  // If the text is not JSON parseable, then a SyntaxError is thrown.
-
-      throw new SyntaxError('JSON.parse');
-  };
-
-})(
-    'undefined' != typeof io ? io : module.exports
-  , typeof JSON !== 'undefined' ? JSON : undefined
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Parser namespace.
-   *
-   * @namespace
-   */
-
-  var parser = exports.parser = {};
-
-  /**
-   * Packet types.
-   */
-
-  var packets = parser.packets = [
-      'disconnect'
-    , 'connect'
-    , 'heartbeat'
-    , 'message'
-    , 'json'
-    , 'event'
-    , 'ack'
-    , 'error'
-    , 'noop'
-  ];
-
-  /**
-   * Errors reasons.
-   */
-
-  var reasons = parser.reasons = [
-      'transport not supported'
-    , 'client not handshaken'
-    , 'unauthorized'
-  ];
-
-  /**
-   * Errors advice.
-   */
-
-  var advice = parser.advice = [
-      'reconnect'
-  ];
-
-  /**
-   * Shortcuts.
-   */
-
-  var JSON = io.JSON
-    , indexOf = io.util.indexOf;
-
-  /**
-   * Encodes a packet.
-   *
-   * @api private
-   */
-
-  parser.encodePacket = function (packet) {
-    var type = indexOf(packets, packet.type)
-      , id = packet.id || ''
-      , endpoint = packet.endpoint || ''
-      , ack = packet.ack
-      , data = null;
-
-    switch (packet.type) {
-      case 'error':
-        var reason = packet.reason ? indexOf(reasons, packet.reason) : ''
-          , adv = packet.advice ? indexOf(advice, packet.advice) : '';
-
-        if (reason !== '' || adv !== '')
-          data = reason + (adv !== '' ? ('+' + adv) : '');
-
-        break;
-
-      case 'message':
-        if (packet.data !== '')
-          data = packet.data;
-        break;
-
-      case 'event':
-        var ev = { name: packet.name };
-
-        if (packet.args && packet.args.length) {
-          ev.args = packet.args;
-        }
-
-        data = JSON.stringify(ev);
-        break;
-
-      case 'json':
-        data = JSON.stringify(packet.data);
-        break;
-
-      case 'connect':
-        if (packet.qs)
-          data = packet.qs;
-        break;
-
-      case 'ack':
-        data = packet.ackId
-          + (packet.args && packet.args.length
-              ? '+' + JSON.stringify(packet.args) : '');
-        break;
-    }
-
-    // construct packet with required fragments
-    var encoded = [
-        type
-      , id + (ack == 'data' ? '+' : '')
-      , endpoint
-    ];
-
-    // data fragment is optional
-    if (data !== null && data !== undefined)
-      encoded.push(data);
-
-    return encoded.join(':');
-  };
-
-  /**
-   * Encodes multiple messages (payload).
-   *
-   * @param {Array} messages
-   * @api private
-   */
-
-  parser.encodePayload = function (packets) {
-    var decoded = '';
-
-    if (packets.length == 1)
-      return packets[0];
-
-    for (var i = 0, l = packets.length; i < l; i++) {
-      var packet = packets[i];
-      decoded += '\ufffd' + packet.length + '\ufffd' + packets[i];
-    }
-
-    return decoded;
-  };
-
-  /**
-   * Decodes a packet
-   *
-   * @api private
-   */
-
-  var regexp = /([^:]+):([0-9]+)?(\+)?:([^:]+)?:?([\s\S]*)?/;
-
-  parser.decodePacket = function (data) {
-    var pieces = data.match(regexp);
-
-    if (!pieces) return {};
-
-    var id = pieces[2] || ''
-      , data = pieces[5] || ''
-      , packet = {
-            type: packets[pieces[1]]
-          , endpoint: pieces[4] || ''
-        };
-
-    // whether we need to acknowledge the packet
-    if (id) {
-      packet.id = id;
-      if (pieces[3])
-        packet.ack = 'data';
-      else
-        packet.ack = true;
-    }
-
-    // handle different packet types
-    switch (packet.type) {
-      case 'error':
-        var pieces = data.split('+');
-        packet.reason = reasons[pieces[0]] || '';
-        packet.advice = advice[pieces[1]] || '';
-        break;
-
-      case 'message':
-        packet.data = data || '';
-        break;
-
-      case 'event':
-        try {
-          var opts = JSON.parse(data);
-          packet.name = opts.name;
-          packet.args = opts.args;
-        } catch (e) { }
-
-        packet.args = packet.args || [];
-        break;
-
-      case 'json':
-        try {
-          packet.data = JSON.parse(data);
-        } catch (e) { }
-        break;
-
-      case 'connect':
-        packet.qs = data || '';
-        break;
-
-      case 'ack':
-        var pieces = data.match(/^([0-9]+)(\+)?(.*)/);
-        if (pieces) {
-          packet.ackId = pieces[1];
-          packet.args = [];
-
-          if (pieces[3]) {
-            try {
-              packet.args = pieces[3] ? JSON.parse(pieces[3]) : [];
-            } catch (e) { }
-          }
-        }
-        break;
-
-      case 'disconnect':
-      case 'heartbeat':
-        break;
-    };
-
-    return packet;
-  };
-
-  /**
-   * Decodes data payload. Detects multiple messages
-   *
-   * @return {Array} messages
-   * @api public
-   */
-
-  parser.decodePayload = function (data) {
-    // IE doesn't like data[i] for unicode chars, charAt works fine
-    if (data.charAt(0) == '\ufffd') {
-      var ret = [];
-
-      for (var i = 1, length = ''; i < data.length; i++) {
-        if (data.charAt(i) == '\ufffd') {
-          ret.push(parser.decodePacket(data.substr(i + 1).substr(0, length)));
-          i += Number(length) + 1;
-          length = '';
-        } else {
-          length += data.charAt(i);
-        }
-      }
-
-      return ret;
-    } else {
-      return [parser.decodePacket(data)];
-    }
-  };
-
-})(
-    'undefined' != typeof io ? io : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.Transport = Transport;
-
-  /**
-   * This is the transport template for all supported transport methods.
-   *
-   * @constructor
-   * @api public
-   */
-
-  function Transport (socket, sessid) {
-    this.socket = socket;
-    this.sessid = sessid;
-  };
-
-  /**
-   * Apply EventEmitter mixin.
-   */
-
-  io.util.mixin(Transport, io.EventEmitter);
-
-  /**
-   * Handles the response from the server. When a new response is received
-   * it will automatically update the timeout, decode the message and
-   * forwards the response to the onMessage function for further processing.
-   *
-   * @param {String} data Response from the server.
-   * @api private
-   */
-
-  Transport.prototype.onData = function (data) {
-    this.clearCloseTimeout();
-    
-    // If the connection in currently open (or in a reopening state) reset the close 
-    // timeout since we have just received data. This check is necessary so
-    // that we don't reset the timeout on an explicitly disconnected connection.
-    if (this.connected || this.connecting || this.reconnecting) {
-      this.setCloseTimeout();
-    }
-
-    if (data !== '') {
-      // todo: we should only do decodePayload for xhr transports
-      var msgs = io.parser.decodePayload(data);
-
-      if (msgs && msgs.length) {
-        for (var i = 0, l = msgs.length; i < l; i++) {
-          this.onPacket(msgs[i]);
-        }
-      }
-    }
-
-    return this;
-  };
-
-  /**
-   * Handles packets.
-   *
-   * @api private
-   */
-
-  Transport.prototype.onPacket = function (packet) {
-    if (packet.type == 'heartbeat') {
-      return this.onHeartbeat();
-    }
-
-    if (packet.type == 'connect' && packet.endpoint == '') {
-      this.onConnect();
-    }
-
-    this.socket.onPacket(packet);
-
-    return this;
-  };
-
-  /**
-   * Sets close timeout
-   *
-   * @api private
-   */
-  
-  Transport.prototype.setCloseTimeout = function () {
-    if (!this.closeTimeout) {
-      var self = this;
-
-      this.closeTimeout = setTimeout(function () {
-        self.onDisconnect();
-      }, this.socket.closeTimeout);
-    }
-  };
-
-  /**
-   * Called when transport disconnects.
-   *
-   * @api private
-   */
-
-  Transport.prototype.onDisconnect = function () {
-    if (this.close && this.open) this.close();
-    this.clearTimeouts();
-    this.socket.onDisconnect();
-    return this;
-  };
-
-  /**
-   * Called when transport connects
-   *
-   * @api private
-   */
-
-  Transport.prototype.onConnect = function () {
-    this.socket.onConnect();
-    return this;
-  }
-
-  /**
-   * Clears close timeout
-   *
-   * @api private
-   */
-
-  Transport.prototype.clearCloseTimeout = function () {
-    if (this.closeTimeout) {
-      clearTimeout(this.closeTimeout);
-      this.closeTimeout = null;
-    }
-  };
-
-  /**
-   * Clear timeouts
-   *
-   * @api private
-   */
-
-  Transport.prototype.clearTimeouts = function () {
-    this.clearCloseTimeout();
-
-    if (this.reopenTimeout) {
-      clearTimeout(this.reopenTimeout);
-    }
-  };
-
-  /**
-   * Sends a packet
-   *
-   * @param {Object} packet object.
-   * @api private
-   */
-
-  Transport.prototype.packet = function (packet) {
-    this.send(io.parser.encodePacket(packet));
-  };
-
-  /**
-   * Send the received heartbeat message back to server. So the server
-   * knows we are still connected.
-   *
-   * @param {String} heartbeat Heartbeat response from the server.
-   * @api private
-   */
-
-  Transport.prototype.onHeartbeat = function (heartbeat) {
-    this.packet({ type: 'heartbeat' });
-  };
- 
-  /**
-   * Called when the transport opens.
-   *
-   * @api private
-   */
-
-  Transport.prototype.onOpen = function () {
-    this.open = true;
-    this.clearCloseTimeout();
-    this.socket.onOpen();
-  };
-
-  /**
-   * Notifies the base when the connection with the Socket.IO server
-   * has been disconnected.
-   *
-   * @api private
-   */
-
-  Transport.prototype.onClose = function () {
-    var self = this;
-
-    /* FIXME: reopen delay causing a infinit loop
-    this.reopenTimeout = setTimeout(function () {
-      self.open();
-    }, this.socket.options['reopen delay']);*/
-
-    this.open = false;
-    this.socket.onClose();
-    this.onDisconnect();
-  };
-
-  /**
-   * Generates a connection url based on the Socket.IO URL Protocol.
-   * See <https://github.com/learnboost/socket.io-node/> for more details.
-   *
-   * @returns {String} Connection url
-   * @api private
-   */
-
-  Transport.prototype.prepareUrl = function () {
-    var options = this.socket.options;
-
-    return this.scheme() + '://'
-      + options.host + ':' + options.port + '/'
-      + options.resource + '/' + io.protocol
-      + '/' + this.name + '/' + this.sessid;
-  };
-
-  /**
-   * Checks if the transport is ready to start a connection.
-   *
-   * @param {Socket} socket The socket instance that needs a transport
-   * @param {Function} fn The callback
-   * @api private
-   */
-
-  Transport.prototype.ready = function (socket, fn) {
-    fn.call(this);
-  };
-})(
-    'undefined' != typeof io ? io : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io, global) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.Socket = Socket;
-
-  /**
-   * Create a new `Socket.IO client` which can establish a persistent
-   * connection with a Socket.IO enabled server.
-   *
-   * @api public
-   */
-
-  function Socket (options) {
-    this.options = {
-        port: 80
-      , secure: false
-      , document: 'document' in global ? document : false
-      , resource: 'socket.io'
-      , transports: io.transports
-      , 'connect timeout': 10000
-      , 'try multiple transports': true
-      , 'reconnect': true
-      , 'reconnection delay': 500
-      , 'reconnection limit': Infinity
-      , 'reopen delay': 3000
-      , 'max reconnection attempts': 10
-      , 'sync disconnect on unload': true
-      , 'auto connect': true
-      , 'flash policy port': 10843
-    };
-
-    io.util.merge(this.options, options);
-
-    this.connected = false;
-    this.open = false;
-    this.connecting = false;
-    this.reconnecting = false;
-    this.namespaces = {};
-    this.buffer = [];
-    this.doBuffer = false;
-
-    if (this.options['sync disconnect on unload'] &&
-        (!this.isXDomain() || io.util.ua.hasCORS)) {
-      var self = this;
-
-      io.util.on(global, 'beforeunload', function () {
-        self.disconnectSync();
-      }, false);
-    }
-
-    if (this.options['auto connect']) {
-      this.connect();
-    }
-};
-
-  /**
-   * Apply EventEmitter mixin.
-   */
-
-  io.util.mixin(Socket, io.EventEmitter);
-
-  /**
-   * Returns a namespace listener/emitter for this socket
-   *
-   * @api public
-   */
-
-  Socket.prototype.of = function (name) {
-    if (!this.namespaces[name]) {
-      this.namespaces[name] = new io.SocketNamespace(this, name);
-
-      if (name !== '') {
-        this.namespaces[name].packet({ type: 'connect' });
-      }
-    }
-
-    return this.namespaces[name];
-  };
-
-  /**
-   * Emits the given event to the Socket and all namespaces
-   *
-   * @api private
-   */
-
-  Socket.prototype.publish = function () {
-    this.emit.apply(this, arguments);
-
-    var nsp;
-
-    for (var i in this.namespaces) {
-      if (this.namespaces.hasOwnProperty(i)) {
-        nsp = this.of(i);
-        nsp.$emit.apply(nsp, arguments);
-      }
-    }
-  };
-
-  /**
-   * Performs the handshake
-   *
-   * @api private
-   */
-
-  function empty () { };
-
-  Socket.prototype.handshake = function (fn) {
-    var self = this
-      , options = this.options;
-
-    function complete (data) {
-      if (data instanceof Error) {
-        self.onError(data.message);
-      } else {
-        fn.apply(null, data.split(':'));
-      }
-    };
-
-    var url = [
-          'http' + (options.secure ? 's' : '') + ':/'
-        , options.host + ':' + options.port
-        , options.resource
-        , io.protocol
-        , io.util.query(this.options.query, 't=' + +new Date)
-      ].join('/');
-
-    if (this.isXDomain() && !io.util.ua.hasCORS) {
-      var insertAt = document.getElementsByTagName('script')[0]
-        , script = document.createElement('script');
-
-      script.src = url + '&jsonp=' + io.j.length;
-      insertAt.parentNode.insertBefore(script, insertAt);
-
-      io.j.push(function (data) {
-        complete(data);
-        script.parentNode.removeChild(script);
-      });
-    } else {
-      var xhr = io.util.request();
-
-      xhr.open('GET', url, true);
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState == 4) {
-          xhr.onreadystatechange = empty;
-
-          if (xhr.status == 200) {
-            complete(xhr.responseText);
-          } else {
-            !self.reconnecting && self.onError(xhr.responseText);
-          }
-        }
-      };
-      xhr.send(null);
-    }
-  };
-
-  /**
-   * Find an available transport based on the options supplied in the constructor.
-   *
-   * @api private
-   */
-
-  Socket.prototype.getTransport = function (override) {
-    var transports = override || this.transports, match;
-
-    for (var i = 0, transport; transport = transports[i]; i++) {
-      if (io.Transport[transport]
-        && io.Transport[transport].check(this)
-        && (!this.isXDomain() || io.Transport[transport].xdomainCheck())) {
-        return new io.Transport[transport](this, this.sessionid);
-      }
-    }
-
-    return null;
-  };
-
-  /**
-   * Connects to the server.
-   *
-   * @param {Function} [fn] Callback.
-   * @returns {io.Socket}
-   * @api public
-   */
-
-  Socket.prototype.connect = function (fn) {
-    if (this.connecting) {
-      return this;
-    }
-
-    var self = this;
-
-    this.handshake(function (sid, heartbeat, close, transports) {
-      self.sessionid = sid;
-      self.closeTimeout = close * 1000;
-      self.heartbeatTimeout = heartbeat * 1000;
-      self.transports = io.util.intersect(
-          transports.split(',')
-        , self.options.transports
-      );
-
-      function connect (transports){
-        if (self.transport) self.transport.clearTimeouts();
-
-        self.transport = self.getTransport(transports);
-        if (!self.transport) return self.publish('connect_failed');
-
-        // once the transport is ready
-        self.transport.ready(self, function () {
-          self.connecting = true;
-          self.publish('connecting', self.transport.name);
-          self.transport.open();
-
-          if (self.options['connect timeout']) {
-            self.connectTimeoutTimer = setTimeout(function () {
-              if (!self.connected) {
-                self.connecting = false;
-
-                if (self.options['try multiple transports']) {
-                  if (!self.remainingTransports) {
-                    self.remainingTransports = self.transports.slice(0);
-                  }
-
-                  var remaining = self.remainingTransports;
-
-                  while (remaining.length > 0 && remaining.splice(0,1)[0] !=
-                         self.transport.name) {}
-
-                    if (remaining.length){
-                      connect(remaining);
-                    } else {
-                      self.publish('connect_failed');
-                    }
-                }
-              }
-            }, self.options['connect timeout']);
-          }
-        });
-      }
-
-      connect();
-
-      self.once('connect', function (){
-        clearTimeout(self.connectTimeoutTimer);
-
-        fn && typeof fn == 'function' && fn();
-      });
-    });
-
-    return this;
-  };
-
-  /**
-   * Sends a message.
-   *
-   * @param {Object} data packet.
-   * @returns {io.Socket}
-   * @api public
-   */
-
-  Socket.prototype.packet = function (data) {
-    if (this.connected && !this.doBuffer) {
-      this.transport.packet(data);
-    } else {
-      this.buffer.push(data);
-    }
-
-    return this;
-  };
-
-  /**
-   * Sets buffer state
-   *
-   * @api private
-   */
-
-  Socket.prototype.setBuffer = function (v) {
-    this.doBuffer = v;
-
-    if (!v && this.connected && this.buffer.length) {
-      this.transport.payload(this.buffer);
-      this.buffer = [];
-    }
-  };
-
-  /**
-   * Disconnect the established connect.
-   *
-   * @returns {io.Socket}
-   * @api public
-   */
-
-  Socket.prototype.disconnect = function () {
-    if (this.connected) {
-      if (this.open) {
-        this.of('').packet({ type: 'disconnect' });
-      }
-
-      // handle disconnection immediately
-      this.onDisconnect('booted');
-    }
-
-    return this;
-  };
-
-  /**
-   * Disconnects the socket with a sync XHR.
-   *
-   * @api private
-   */
-
-  Socket.prototype.disconnectSync = function () {
-    // ensure disconnection
-    var xhr = io.util.request()
-      , uri = this.resource + '/' + io.protocol + '/' + this.sessionid;
-
-    xhr.open('GET', uri, true);
-
-    // handle disconnection immediately
-    this.onDisconnect('booted');
-  };
-
-  /**
-   * Check if we need to use cross domain enabled transports. Cross domain would
-   * be a different port or different domain name.
-   *
-   * @returns {Boolean}
-   * @api private
-   */
-
-  Socket.prototype.isXDomain = function () {
-
-    var port = global.location.port ||
-      ('https:' == global.location.protocol ? 443 : 80);
-
-    return this.options.host !== global.location.hostname 
-      || this.options.port != port;
-  };
-
-  /**
-   * Called upon handshake.
-   *
-   * @api private
-   */
-
-  Socket.prototype.onConnect = function () {
-    if (!this.connected) {
-      this.connected = true;
-      this.connecting = false;
-      if (!this.doBuffer) {
-        // make sure to flush the buffer
-        this.setBuffer(false);
-      }
-      this.emit('connect');
-    }
-  };
-
-  /**
-   * Called when the transport opens
-   *
-   * @api private
-   */
-
-  Socket.prototype.onOpen = function () {
-    this.open = true;
-  };
-
-  /**
-   * Called when the transport closes.
-   *
-   * @api private
-   */
-
-  Socket.prototype.onClose = function () {
-    this.open = false;
-  };
-
-  /**
-   * Called when the transport first opens a connection
-   *
-   * @param text
-   */
-
-  Socket.prototype.onPacket = function (packet) {
-    this.of(packet.endpoint).onPacket(packet);
-  };
-
-  /**
-   * Handles an error.
-   *
-   * @api private
-   */
-
-  Socket.prototype.onError = function (err) {
-    if (err && err.advice) {
-      if (err.advice === 'reconnect' && this.connected) {
-        this.disconnect();
-        this.reconnect();
-      }
-    }
-
-    this.publish('error', err && err.reason ? err.reason : err);
-  };
-
-  /**
-   * Called when the transport disconnects.
-   *
-   * @api private
-   */
-
-  Socket.prototype.onDisconnect = function (reason) {
-    var wasConnected = this.connected;
-
-    this.connected = false;
-    this.connecting = false;
-    this.open = false;
-
-    if (wasConnected) {
-      this.transport.close();
-      this.transport.clearTimeouts();
-      this.publish('disconnect', reason);
-
-      if ('booted' != reason && this.options.reconnect && !this.reconnecting) {
-        this.reconnect();
-      }
-    }
-  };
-
-  /**
-   * Called upon reconnection.
-   *
-   * @api private
-   */
-
-  Socket.prototype.reconnect = function () {
-    this.reconnecting = true;
-    this.reconnectionAttempts = 0;
-    this.reconnectionDelay = this.options['reconnection delay'];
-
-    var self = this
-      , maxAttempts = this.options['max reconnection attempts']
-      , tryMultiple = this.options['try multiple transports']
-      , limit = this.options['reconnection limit'];
-
-    function reset () {
-      if (self.connected) {
-        for (var i in self.namespaces) {
-          if (self.namespaces.hasOwnProperty(i) && '' !== i) {
-              self.namespaces[i].packet({ type: 'connect' });
-          }
-        }
-        self.publish('reconnect', self.transport.name, self.reconnectionAttempts);
-      }
-
-      self.removeListener('connect_failed', maybeReconnect);
-      self.removeListener('connect', maybeReconnect);
-
-      self.reconnecting = false;
-
-      delete self.reconnectionAttempts;
-      delete self.reconnectionDelay;
-      delete self.reconnectionTimer;
-      delete self.redoTransports;
-
-      self.options['try multiple transports'] = tryMultiple;
-    };
-
-    function maybeReconnect () {
-      if (!self.reconnecting) {
-        return;
-      }
-
-      if (self.connected) {
-        return reset();
-      };
-
-      if (self.connecting && self.reconnecting) {
-        return self.reconnectionTimer = setTimeout(maybeReconnect, 1000);
-      }
-
-      if (self.reconnectionAttempts++ >= maxAttempts) {
-        if (!self.redoTransports) {
-          self.on('connect_failed', maybeReconnect);
-          self.options['try multiple transports'] = true;
-          self.transport = self.getTransport();
-          self.redoTransports = true;
-          self.connect();
-        } else {
-          self.publish('reconnect_failed');
-          reset();
-        }
-      } else {
-        if (self.reconnectionDelay < limit) {
-          self.reconnectionDelay *= 2; // exponential back off
-        }
-
-        self.connect();
-        self.publish('reconnecting', self.reconnectionDelay, self.reconnectionAttempts);
-        self.reconnectionTimer = setTimeout(maybeReconnect, self.reconnectionDelay);
-      }
-    };
-
-    this.options['try multiple transports'] = false;
-    this.reconnectionTimer = setTimeout(maybeReconnect, this.reconnectionDelay);
-
-    this.on('connect', maybeReconnect);
-  };
-
-})(
-    'undefined' != typeof io ? io : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-  , this
-);
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.SocketNamespace = SocketNamespace;
-
-  /**
-   * Socket namespace constructor.
-   *
-   * @constructor
-   * @api public
-   */
-
-  function SocketNamespace (socket, name) {
-    this.socket = socket;
-    this.name = name || '';
-    this.flags = {};
-    this.json = new Flag(this, 'json');
-    this.ackPackets = 0;
-    this.acks = {};
-  };
-
-  /**
-   * Apply EventEmitter mixin.
-   */
-
-  io.util.mixin(SocketNamespace, io.EventEmitter);
-
-  /**
-   * Copies emit since we override it
-   *
-   * @api private
-   */
-
-  SocketNamespace.prototype.$emit = io.EventEmitter.prototype.emit;
-
-  /**
-   * Creates a new namespace, by proxying the request to the socket. This
-   * allows us to use the synax as we do on the server.
-   *
-   * @api public
-   */
-
-  SocketNamespace.prototype.of = function () {
-    return this.socket.of.apply(this.socket, arguments);
-  };
-
-  /**
-   * Sends a packet.
-   *
-   * @api private
-   */
-
-  SocketNamespace.prototype.packet = function (packet) {
-    packet.endpoint = this.name;
-    this.socket.packet(packet);
-    this.flags = {};
-    return this;
-  };
-
-  /**
-   * Sends a message
-   *
-   * @api public
-   */
-
-  SocketNamespace.prototype.send = function (data, fn) {
-    var packet = {
-        type: this.flags.json ? 'json' : 'message'
-      , data: data
-    };
-
-    if ('function' == typeof fn) {
-      packet.id = ++this.ackPackets;
-      packet.ack = true;
-      this.acks[packet.id] = fn;
-    }
-
-    return this.packet(packet);
-  };
-
-  /**
-   * Emits an event
-   *
-   * @api public
-   */
-  
-  SocketNamespace.prototype.emit = function (name) {
-    var args = Array.prototype.slice.call(arguments, 1)
-      , lastArg = args[args.length - 1]
-      , packet = {
-            type: 'event'
-          , name: name
-        };
-
-    if ('function' == typeof lastArg) {
-      packet.id = ++this.ackPackets;
-      packet.ack = 'data';
-      this.acks[packet.id] = lastArg;
-      args = args.slice(0, args.length - 1);
-    }
-
-    packet.args = args;
-
-    return this.packet(packet);
-  };
-
-  /**
-   * Disconnects the namespace
-   *
-   * @api private
-   */
-
-  SocketNamespace.prototype.disconnect = function () {
-    if (this.name === '') {
-      this.socket.disconnect();
-    } else {
-      this.packet({ type: 'disconnect' });
-      this.$emit('disconnect');
-    }
-
-    return this;
-  };
-
-  /**
-   * Handles a packet
-   *
-   * @api private
-   */
-
-  SocketNamespace.prototype.onPacket = function (packet) {
-    var self = this;
-
-    function ack () {
-      self.packet({
-          type: 'ack'
-        , args: io.util.toArray(arguments)
-        , ackId: packet.id
-      });
-    };
-
-    switch (packet.type) {
-      case 'connect':
-        this.$emit('connect');
-        break;
-
-      case 'disconnect':
-        if (this.name === '') {
-          this.socket.onDisconnect(packet.reason || 'booted');
-        } else {
-          this.$emit('disconnect', packet.reason);
-        }
-        break;
-
-      case 'message':
-      case 'json':
-        var params = ['message', packet.data];
-
-        if (packet.ack == 'data') {
-          params.push(ack);
-        } else if (packet.ack) {
-          this.packet({ type: 'ack', ackId: packet.id });
-        }
-
-        this.$emit.apply(this, params);
-        break;
-
-      case 'event':
-        var params = [packet.name].concat(packet.args);
-
-        if (packet.ack == 'data')
-          params.push(ack);
-
-        this.$emit.apply(this, params);
-        break;
-
-      case 'ack':
-        if (this.acks[packet.ackId]) {
-          this.acks[packet.ackId].apply(this, packet.args);
-          delete this.acks[packet.ackId];
-        }
-        break;
-
-      case 'error':
-        if (packet.advice){
-          this.socket.onError(packet);
-        } else {
-          if (packet.reason == 'unauthorized') {
-            this.$emit('connect_failed', packet.reason);
-          } else {
-            this.$emit('error', packet.reason);
-          }
-        }
-        break;
-    }
-  };
-
-  /**
-   * Flag interface.
-   *
-   * @api private
-   */
-
-  function Flag (nsp, name) {
-    this.namespace = nsp;
-    this.name = name;
-  };
-
-  /**
-   * Send a message
-   *
-   * @api public
-   */
-
-  Flag.prototype.send = function () {
-    this.namespace.flags[this.name] = true;
-    this.namespace.send.apply(this.namespace, arguments);
-  };
-
-  /**
-   * Emit an event
-   *
-   * @api public
-   */
-
-  Flag.prototype.emit = function () {
-    this.namespace.flags[this.name] = true;
-    this.namespace.emit.apply(this.namespace, arguments);
-  };
-
-})(
-    'undefined' != typeof io ? io : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io, global) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.websocket = WS;
-
-  /**
-   * The WebSocket transport uses the HTML5 WebSocket API to establish an
-   * persistent connection with the Socket.IO server. This transport will also
-   * be inherited by the FlashSocket fallback as it provides a API compatible
-   * polyfill for the WebSockets.
-   *
-   * @constructor
-   * @extends {io.Transport}
-   * @api public
-   */
-
-  function WS (socket) {
-    io.Transport.apply(this, arguments);
-  };
-
-  /**
-   * Inherits from Transport.
-   */
-
-  io.util.inherit(WS, io.Transport);
-
-  /**
-   * Transport name
-   *
-   * @api public
-   */
-
-  WS.prototype.name = 'websocket';
-
-  /**
-   * Initializes a new `WebSocket` connection with the Socket.IO server. We attach
-   * all the appropriate listeners to handle the responses from the server.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  WS.prototype.open = function () {
-    var query = io.util.query(this.socket.options.query)
-      , self = this
-      , Socket
-
-
-    if (!Socket) {
-      Socket = global.MozWebSocket || global.WebSocket;
-    }
-
-    this.websocket = new Socket(this.prepareUrl() + query);
-
-    this.websocket.onopen = function () {
-      self.onOpen();
-      self.socket.setBuffer(false);
-    };
-    this.websocket.onmessage = function (ev) {
-      self.onData(ev.data);
-    };
-    this.websocket.onclose = function () {
-      self.onClose();
-      self.socket.setBuffer(true);
-    };
-    this.websocket.onerror = function (e) {
-      self.onError(e);
-    };
-
-    return this;
-  };
-
-  /**
-   * Send a message to the Socket.IO server. The message will automatically be
-   * encoded in the correct message format.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  WS.prototype.send = function (data) {
-    this.websocket.send(data);
-    return this;
-  };
-
-  /**
-   * Payload
-   *
-   * @api private
-   */
-
-  WS.prototype.payload = function (arr) {
-    for (var i = 0, l = arr.length; i < l; i++) {
-      this.packet(arr[i]);
-    }
-    return this;
-  };
-
-  /**
-   * Disconnect the established `WebSocket` connection.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  WS.prototype.close = function () {
-    this.websocket.close();
-    return this;
-  };
-
-  /**
-   * Handle the errors that `WebSocket` might be giving when we
-   * are attempting to connect or send messages.
-   *
-   * @param {Error} e The error.
-   * @api private
-   */
-
-  WS.prototype.onError = function (e) {
-    this.socket.onError(e);
-  };
-
-  /**
-   * Returns the appropriate scheme for the URI generation.
-   *
-   * @api private
-   */
-  WS.prototype.scheme = function () {
-    return this.socket.options.secure ? 'wss' : 'ws';
-  };
-
-  /**
-   * Checks if the browser has support for native `WebSockets` and that
-   * it's not the polyfill created for the FlashSocket transport.
-   *
-   * @return {Boolean}
-   * @api public
-   */
-
-  WS.check = function () {
-    return ('WebSocket' in global && !('__addTask' in WebSocket))
-          || 'MozWebSocket' in global;
-  };
-
-  /**
-   * Check if the `WebSocket` transport support cross domain communications.
-   *
-   * @returns {Boolean}
-   * @api public
-   */
-
-  WS.xdomainCheck = function () {
-    return true;
-  };
-
-  /**
-   * Add the transport to your public io.transports array.
-   *
-   * @api private
-   */
-
-  io.transports.push('websocket');
-
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-  , this
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.flashsocket = Flashsocket;
-
-  /**
-   * The FlashSocket transport. This is a API wrapper for the HTML5 WebSocket
-   * specification. It uses a .swf file to communicate with the server. If you want
-   * to serve the .swf file from a other server than where the Socket.IO script is
-   * coming from you need to use the insecure version of the .swf. More information
-   * about this can be found on the github page.
-   *
-   * @constructor
-   * @extends {io.Transport.websocket}
-   * @api public
-   */
-
-  function Flashsocket () {
-    io.Transport.websocket.apply(this, arguments);
-  };
-
-  /**
-   * Inherits from Transport.
-   */
-
-  io.util.inherit(Flashsocket, io.Transport.websocket);
-
-  /**
-   * Transport name
-   *
-   * @api public
-   */
-
-  Flashsocket.prototype.name = 'flashsocket';
-
-  /**
-   * Disconnect the established `FlashSocket` connection. This is done by adding a 
-   * new task to the FlashSocket. The rest will be handled off by the `WebSocket` 
-   * transport.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  Flashsocket.prototype.open = function () {
-    var self = this
-      , args = arguments;
-
-    WebSocket.__addTask(function () {
-      io.Transport.websocket.prototype.open.apply(self, args);
-    });
-    return this;
-  };
-  
-  /**
-   * Sends a message to the Socket.IO server. This is done by adding a new
-   * task to the FlashSocket. The rest will be handled off by the `WebSocket` 
-   * transport.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  Flashsocket.prototype.send = function () {
-    var self = this, args = arguments;
-    WebSocket.__addTask(function () {
-      io.Transport.websocket.prototype.send.apply(self, args);
-    });
-    return this;
-  };
-
-  /**
-   * Disconnects the established `FlashSocket` connection.
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  Flashsocket.prototype.close = function () {
-    WebSocket.__tasks.length = 0;
-    io.Transport.websocket.prototype.close.call(this);
-    return this;
-  };
-
-  /**
-   * The WebSocket fall back needs to append the flash container to the body
-   * element, so we need to make sure we have access to it. Or defer the call
-   * until we are sure there is a body element.
-   *
-   * @param {Socket} socket The socket instance that needs a transport
-   * @param {Function} fn The callback
-   * @api private
-   */
-
-  Flashsocket.prototype.ready = function (socket, fn) {
-    function init () {
-      var options = socket.options
-        , port = options['flash policy port']
-        , path = [
-              'http' + (options.secure ? 's' : '') + ':/'
-            , options.host + ':' + options.port
-            , options.resource
-            , 'static/flashsocket'
-            , 'WebSocketMain' + (socket.isXDomain() ? 'Insecure' : '') + '.swf'
-          ];
-
-      // Only start downloading the swf file when the checked that this browser
-      // actually supports it
-      if (!Flashsocket.loaded) {
-        if (typeof WEB_SOCKET_SWF_LOCATION === 'undefined') {
-          // Set the correct file based on the XDomain settings
-          WEB_SOCKET_SWF_LOCATION = path.join('/');
-        }
-
-        if (port !== 843) {
-          WebSocket.loadFlashPolicyFile('xmlsocket://' + options.host + ':' + port);
-        }
-
-        WebSocket.__initialize();
-        Flashsocket.loaded = true;
-      }
-
-      fn.call(self);
-    }
-
-    var self = this;
-    if (document.body) return init();
-
-    io.util.load(init);
-  };
-
-  /**
-   * Check if the FlashSocket transport is supported as it requires that the Adobe
-   * Flash Player plug-in version `10.0.0` or greater is installed. And also check if
-   * the polyfill is correctly loaded.
-   *
-   * @returns {Boolean}
-   * @api public
-   */
-
-  Flashsocket.check = function () {
-    if (
-        typeof WebSocket == 'undefined'
-      || !('__initialize' in WebSocket) || !swfobject
-    ) return false;
-
-    return swfobject.getFlashPlayerVersion().major >= 10;
-  };
-
-  /**
-   * Check if the FlashSocket transport can be used as cross domain / cross origin 
-   * transport. Because we can't see which type (secure or insecure) of .swf is used
-   * we will just return true.
-   *
-   * @returns {Boolean}
-   * @api public
-   */
-
-  Flashsocket.xdomainCheck = function () {
-    return true;
-  };
-
-  /**
-   * Disable AUTO_INITIALIZATION
-   */
-
-  if (typeof window != 'undefined') {
-    WEB_SOCKET_DISABLE_AUTO_INITIALIZATION = true;
-  }
-
-  /**
-   * Add the transport to your public io.transports array.
-   *
-   * @api private
-   */
-
-  io.transports.push('flashsocket');
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-/*	SWFObject v2.2 <http://code.google.com/p/swfobject/> 
-	is released under the MIT License <http://www.opensource.org/licenses/mit-license.php> 
-*/
-if ('undefined' != typeof window) {
-var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="ShockwaveFlash.ShockwaveFlash",q="application/x-shockwave-flash",R="SWFObjectExprInst",x="onreadystatechange",O=window,j=document,t=navigator,T=false,U=[h],o=[],N=[],I=[],l,Q,E,B,J=false,a=false,n,G,m=true,M=function(){var aa=typeof j.getElementById!=D&&typeof j.getElementsByTagName!=D&&typeof j.createElement!=D,ah=t.userAgent.toLowerCase(),Y=t.platform.toLowerCase(),ae=Y?/win/.test(Y):/win/.test(ah),ac=Y?/mac/.test(Y):/mac/.test(ah),af=/webkit/.test(ah)?parseFloat(ah.replace(/^.*webkit\/(\d+(\.\d+)?).*$/,"$1")):false,X=!+"\v1",ag=[0,0,0],ab=null;if(typeof t.plugins!=D&&typeof t.plugins[S]==r){ab=t.plugins[S].description;if(ab&&!(typeof t.mimeTypes!=D&&t.mimeTypes[q]&&!t.mimeTypes[q].enabledPlugin)){T=true;X=false;ab=ab.replace(/^.*\s+(\S+\s+\S+$)/,"$1");ag[0]=parseInt(ab.replace(/^(.*)\..*$/,"$1"),10);ag[1]=parseInt(ab.replace(/^.*\.(.*)\s.*$/,"$1"),10);ag[2]=/[a-zA-Z]/.test(ab)?parseInt(ab.replace(/^.*[a-zA-Z]+(.*)$/,"$1"),10):0}}else{if(typeof O.ActiveXObject!=D){try{var ad=new ActiveXObject(W);if(ad){ab=ad.GetVariable("$version");if(ab){X=true;ab=ab.split(" ")[1].split(",");ag=[parseInt(ab[0],10),parseInt(ab[1],10),parseInt(ab[2],10)]}}}catch(Z){}}}return{w3:aa,pv:ag,wk:af,ie:X,win:ae,mac:ac}}(),k=function(){if(!M.w3){return}if((typeof j.readyState!=D&&j.readyState=="complete")||(typeof j.readyState==D&&(j.getElementsByTagName("body")[0]||j.body))){f()}if(!J){if(typeof j.addEventListener!=D){j.addEventListener("DOMContentLoaded",f,false)}if(M.ie&&M.win){j.attachEvent(x,function(){if(j.readyState=="complete"){j.detachEvent(x,arguments.callee);f()}});if(O==top){(function(){if(J){return}try{j.documentElement.doScroll("left")}catch(X){setTimeout(arguments.callee,0);return}f()})()}}if(M.wk){(function(){if(J){return}if(!/loaded|complete/.test(j.readyState)){setTimeout(arguments.callee,0);return}f()})()}s(f)}}();function f(){if(J){return}try{var Z=j.getElementsByTagName("body")[0].appendChild(C("span"));Z.parentNode.removeChild(Z)}catch(aa){return}J=true;var X=U.length;for(var Y=0;Y<X;Y++){U[Y]()}}function K(X){if(J){X()}else{U[U.length]=X}}function s(Y){if(typeof O.addEventListener!=D){O.addEventListener("load",Y,false)}else{if(typeof j.addEventListener!=D){j.addEventListener("load",Y,false)}else{if(typeof O.attachEvent!=D){i(O,"onload",Y)}else{if(typeof O.onload=="function"){var X=O.onload;O.onload=function(){X();Y()}}else{O.onload=Y}}}}}function h(){if(T){V()}else{H()}}function V(){var X=j.getElementsByTagName("body")[0];var aa=C(r);aa.setAttribute("type",q);var Z=X.appendChild(aa);if(Z){var Y=0;(function(){if(typeof Z.GetVariable!=D){var ab=Z.GetVariable("$version");if(ab){ab=ab.split(" ")[1].split(",");M.pv=[parseInt(ab[0],10),parseInt(ab[1],10),parseInt(ab[2],10)]}}else{if(Y<10){Y++;setTimeout(arguments.callee,10);return}}X.removeChild(aa);Z=null;H()})()}else{H()}}function H(){var ag=o.length;if(ag>0){for(var af=0;af<ag;af++){var Y=o[af].id;var ab=o[af].callbackFn;var aa={success:false,id:Y};if(M.pv[0]>0){var ae=c(Y);if(ae){if(F(o[af].swfVersion)&&!(M.wk&&M.wk<312)){w(Y,true);if(ab){aa.success=true;aa.ref=z(Y);ab(aa)}}else{if(o[af].expressInstall&&A()){var ai={};ai.data=o[af].expressInstall;ai.width=ae.getAttribute("width")||"0";ai.height=ae.getAttribute("height")||"0";if(ae.getAttribute("class")){ai.styleclass=ae.getAttribute("class")}if(ae.getAttribute("align")){ai.align=ae.getAttribute("align")}var ah={};var X=ae.getElementsByTagName("param");var ac=X.length;for(var ad=0;ad<ac;ad++){if(X[ad].getAttribute("name").toLowerCase()!="movie"){ah[X[ad].getAttribute("name")]=X[ad].getAttribute("value")}}P(ai,ah,Y,ab)}else{p(ae);if(ab){ab(aa)}}}}}else{w(Y,true);if(ab){var Z=z(Y);if(Z&&typeof Z.SetVariable!=D){aa.success=true;aa.ref=Z}ab(aa)}}}}}function z(aa){var X=null;var Y=c(aa);if(Y&&Y.nodeName=="OBJECT"){if(typeof Y.SetVariable!=D){X=Y}else{var Z=Y.getElementsByTagName(r)[0];if(Z){X=Z}}}return X}function A(){return !a&&F("6.0.65")&&(M.win||M.mac)&&!(M.wk&&M.wk<312)}function P(aa,ab,X,Z){a=true;E=Z||null;B={success:false,id:X};var ae=c(X);if(ae){if(ae.nodeName=="OBJECT"){l=g(ae);Q=null}else{l=ae;Q=X}aa.id=R;if(typeof aa.width==D||(!/%$/.test(aa.width)&&parseInt(aa.width,10)<310)){aa.width="310"}if(typeof aa.height==D||(!/%$/.test(aa.height)&&parseInt(aa.height,10)<137)){aa.height="137"}j.title=j.title.slice(0,47)+" - Flash Player Installation";var ad=M.ie&&M.win?"ActiveX":"PlugIn",ac="MMredirectURL="+O.location.toString().replace(/&/g,"%26")+"&MMplayerType="+ad+"&MMdoctitle="+j.title;if(typeof ab.flashvars!=D){ab.flashvars+="&"+ac}else{ab.flashvars=ac}if(M.ie&&M.win&&ae.readyState!=4){var Y=C("div");X+="SWFObjectNew";Y.setAttribute("id",X);ae.parentNode.insertBefore(Y,ae);ae.style.display="none";(function(){if(ae.readyState==4){ae.parentNode.removeChild(ae)}else{setTimeout(arguments.callee,10)}})()}u(aa,ab,X)}}function p(Y){if(M.ie&&M.win&&Y.readyState!=4){var X=C("div");Y.parentNode.insertBefore(X,Y);X.parentNode.replaceChild(g(Y),X);Y.style.display="none";(function(){if(Y.readyState==4){Y.parentNode.removeChild(Y)}else{setTimeout(arguments.callee,10)}})()}else{Y.parentNode.replaceChild(g(Y),Y)}}function g(ab){var aa=C("div");if(M.win&&M.ie){aa.innerHTML=ab.innerHTML}else{var Y=ab.getElementsByTagName(r)[0];if(Y){var ad=Y.childNodes;if(ad){var X=ad.length;for(var Z=0;Z<X;Z++){if(!(ad[Z].nodeType==1&&ad[Z].nodeName=="PARAM")&&!(ad[Z].nodeType==8)){aa.appendChild(ad[Z].cloneNode(true))}}}}}return aa}function u(ai,ag,Y){var X,aa=c(Y);if(M.wk&&M.wk<312){return X}if(aa){if(typeof ai.id==D){ai.id=Y}if(M.ie&&M.win){var ah="";for(var ae in ai){if(ai[ae]!=Object.prototype[ae]){if(ae.toLowerCase()=="data"){ag.movie=ai[ae]}else{if(ae.toLowerCase()=="styleclass"){ah+=' class="'+ai[ae]+'"'}else{if(ae.toLowerCase()!="classid"){ah+=" "+ae+'="'+ai[ae]+'"'}}}}}var af="";for(var ad in ag){if(ag[ad]!=Object.prototype[ad]){af+='<param name="'+ad+'" value="'+ag[ad]+'" />'}}aa.outerHTML='<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"'+ah+">"+af+"</object>";N[N.length]=ai.id;X=c(ai.id)}else{var Z=C(r);Z.setAttribute("type",q);for(var ac in ai){if(ai[ac]!=Object.prototype[ac]){if(ac.toLowerCase()=="styleclass"){Z.setAttribute("class",ai[ac])}else{if(ac.toLowerCase()!="classid"){Z.setAttribute(ac,ai[ac])}}}}for(var ab in ag){if(ag[ab]!=Object.prototype[ab]&&ab.toLowerCase()!="movie"){e(Z,ab,ag[ab])}}aa.parentNode.replaceChild(Z,aa);X=Z}}return X}function e(Z,X,Y){var aa=C("param");aa.setAttribute("name",X);aa.setAttribute("value",Y);Z.appendChild(aa)}function y(Y){var X=c(Y);if(X&&X.nodeName=="OBJECT"){if(M.ie&&M.win){X.style.display="none";(function(){if(X.readyState==4){b(Y)}else{setTimeout(arguments.callee,10)}})()}else{X.parentNode.removeChild(X)}}}function b(Z){var Y=c(Z);if(Y){for(var X in Y){if(typeof Y[X]=="function"){Y[X]=null}}Y.parentNode.removeChild(Y)}}function c(Z){var X=null;try{X=j.getElementById(Z)}catch(Y){}return X}function C(X){return j.createElement(X)}function i(Z,X,Y){Z.attachEvent(X,Y);I[I.length]=[Z,X,Y]}function F(Z){var Y=M.pv,X=Z.split(".");X[0]=parseInt(X[0],10);X[1]=parseInt(X[1],10)||0;X[2]=parseInt(X[2],10)||0;return(Y[0]>X[0]||(Y[0]==X[0]&&Y[1]>X[1])||(Y[0]==X[0]&&Y[1]==X[1]&&Y[2]>=X[2]))?true:false}function v(ac,Y,ad,ab){if(M.ie&&M.mac){return}var aa=j.getElementsByTagName("head")[0];if(!aa){return}var X=(ad&&typeof ad=="string")?ad:"screen";if(ab){n=null;G=null}if(!n||G!=X){var Z=C("style");Z.setAttribute("type","text/css");Z.setAttribute("media",X);n=aa.appendChild(Z);if(M.ie&&M.win&&typeof j.styleSheets!=D&&j.styleSheets.length>0){n=j.styleSheets[j.styleSheets.length-1]}G=X}if(M.ie&&M.win){if(n&&typeof n.addRule==r){n.addRule(ac,Y)}}else{if(n&&typeof j.createTextNode!=D){n.appendChild(j.createTextNode(ac+" {"+Y+"}"))}}}function w(Z,X){if(!m){return}var Y=X?"visible":"hidden";if(J&&c(Z)){c(Z).style.visibility=Y}else{v("#"+Z,"visibility:"+Y)}}function L(Y){var Z=/[\\\"<>\.;]/;var X=Z.exec(Y)!=null;return X&&typeof encodeURIComponent!=D?encodeURIComponent(Y):Y}var d=function(){if(M.ie&&M.win){window.attachEvent("onunload",function(){var ac=I.length;for(var ab=0;ab<ac;ab++){I[ab][0].detachEvent(I[ab][1],I[ab][2])}var Z=N.length;for(var aa=0;aa<Z;aa++){y(N[aa])}for(var Y in M){M[Y]=null}M=null;for(var X in swfobject){swfobject[X]=null}swfobject=null})}}();return{registerObject:function(ab,X,aa,Z){if(M.w3&&ab&&X){var Y={};Y.id=ab;Y.swfVersion=X;Y.expressInstall=aa;Y.callbackFn=Z;o[o.length]=Y;w(ab,false)}else{if(Z){Z({success:false,id:ab})}}},getObjectById:function(X){if(M.w3){return z(X)}},embedSWF:function(ab,ah,ae,ag,Y,aa,Z,ad,af,ac){var X={success:false,id:ah};if(M.w3&&!(M.wk&&M.wk<312)&&ab&&ah&&ae&&ag&&Y){w(ah,false);K(function(){ae+="";ag+="";var aj={};if(af&&typeof af===r){for(var al in af){aj[al]=af[al]}}aj.data=ab;aj.width=ae;aj.height=ag;var am={};if(ad&&typeof ad===r){for(var ak in ad){am[ak]=ad[ak]}}if(Z&&typeof Z===r){for(var ai in Z){if(typeof am.flashvars!=D){am.flashvars+="&"+ai+"="+Z[ai]}else{am.flashvars=ai+"="+Z[ai]}}}if(F(Y)){var an=u(aj,am,ah);if(aj.id==ah){w(ah,true)}X.success=true;X.ref=an}else{if(aa&&A()){aj.data=aa;P(aj,am,ah,ac);return}else{w(ah,true)}}if(ac){ac(X)}})}else{if(ac){ac(X)}}},switchOffAutoHideShow:function(){m=false},ua:M,getFlashPlayerVersion:function(){return{major:M.pv[0],minor:M.pv[1],release:M.pv[2]}},hasFlashPlayerVersion:F,createSWF:function(Z,Y,X){if(M.w3){return u(Z,Y,X)}else{return undefined}},showExpressInstall:function(Z,aa,X,Y){if(M.w3&&A()){P(Z,aa,X,Y)}},removeSWF:function(X){if(M.w3){y(X)}},createCSS:function(aa,Z,Y,X){if(M.w3){v(aa,Z,Y,X)}},addDomLoadEvent:K,addLoadEvent:s,getQueryParamValue:function(aa){var Z=j.location.search||j.location.hash;if(Z){if(/\?/.test(Z)){Z=Z.split("?")[1]}if(aa==null){return L(Z)}var Y=Z.split("&");for(var X=0;X<Y.length;X++){if(Y[X].substring(0,Y[X].indexOf("="))==aa){return L(Y[X].substring((Y[X].indexOf("=")+1)))}}}return""},expressInstallCallback:function(){if(a){var X=c(R);if(X&&l){X.parentNode.replaceChild(l,X);if(Q){w(Q,true);if(M.ie&&M.win){l.style.display="block"}}if(E){E(B)}}a=false}}}}();
-}
-// Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
-// License: New BSD License
-// Reference: http://dev.w3.org/html5/websockets/
-// Reference: http://tools.ietf.org/html/draft-hixie-thewebsocketprotocol
-
-(function() {
-  
-  if ('undefined' == typeof window || window.WebSocket) return;
-
-  var console = window.console;
-  if (!console || !console.log || !console.error) {
-    console = {log: function(){ }, error: function(){ }};
-  }
-  
-  if (!swfobject.hasFlashPlayerVersion("10.0.0")) {
-    console.error("Flash Player >= 10.0.0 is required.");
-    return;
-  }
-  if (location.protocol == "file:") {
-    console.error(
-      "WARNING: web-socket-js doesn't work in file:///... URL " +
-      "unless you set Flash Security Settings properly. " +
-      "Open the page via Web server i.e. http://...");
-  }
-
-  /**
-   * This class represents a faux web socket.
-   * @param {string} url
-   * @param {array or string} protocols
-   * @param {string} proxyHost
-   * @param {int} proxyPort
-   * @param {string} headers
-   */
-  WebSocket = function(url, protocols, proxyHost, proxyPort, headers) {
-    var self = this;
-    self.__id = WebSocket.__nextId++;
-    WebSocket.__instances[self.__id] = self;
-    self.readyState = WebSocket.CONNECTING;
-    self.bufferedAmount = 0;
-    self.__events = {};
-    if (!protocols) {
-      protocols = [];
-    } else if (typeof protocols == "string") {
-      protocols = [protocols];
-    }
-    // Uses setTimeout() to make sure __createFlash() runs after the caller sets ws.onopen etc.
-    // Otherwise, when onopen fires immediately, onopen is called before it is set.
-    setTimeout(function() {
-      WebSocket.__addTask(function() {
-        WebSocket.__flash.create(
-            self.__id, url, protocols, proxyHost || null, proxyPort || 0, headers || null);
-      });
-    }, 0);
-  };
-
-  /**
-   * Send data to the web socket.
-   * @param {string} data  The data to send to the socket.
-   * @return {boolean}  True for success, false for failure.
-   */
-  WebSocket.prototype.send = function(data) {
-    if (this.readyState == WebSocket.CONNECTING) {
-      throw "INVALID_STATE_ERR: Web Socket connection has not been established";
-    }
-    // We use encodeURIComponent() here, because FABridge doesn't work if
-    // the argument includes some characters. We don't use escape() here
-    // because of this:
-    // https://developer.mozilla.org/en/Core_JavaScript_1.5_Guide/Functions#escape_and_unescape_Functions
-    // But it looks decodeURIComponent(encodeURIComponent(s)) doesn't
-    // preserve all Unicode characters either e.g. "\uffff" in Firefox.
-    // Note by wtritch: Hopefully this will not be necessary using ExternalInterface.  Will require
-    // additional testing.
-    var result = WebSocket.__flash.send(this.__id, encodeURIComponent(data));
-    if (result < 0) { // success
-      return true;
-    } else {
-      this.bufferedAmount += result;
-      return false;
-    }
-  };
-
-  /**
-   * Close this web socket gracefully.
-   */
-  WebSocket.prototype.close = function() {
-    if (this.readyState == WebSocket.CLOSED || this.readyState == WebSocket.CLOSING) {
-      return;
-    }
-    this.readyState = WebSocket.CLOSING;
-    WebSocket.__flash.close(this.__id);
-  };
-
-  /**
-   * Implementation of {@link <a href="http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-registration">DOM 2 EventTarget Interface</a>}
-   *
-   * @param {string} type
-   * @param {function} listener
-   * @param {boolean} useCapture
-   * @return void
-   */
-  WebSocket.prototype.addEventListener = function(type, listener, useCapture) {
-    if (!(type in this.__events)) {
-      this.__events[type] = [];
-    }
-    this.__events[type].push(listener);
-  };
-
-  /**
-   * Implementation of {@link <a href="http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-registration">DOM 2 EventTarget Interface</a>}
-   *
-   * @param {string} type
-   * @param {function} listener
-   * @param {boolean} useCapture
-   * @return void
-   */
-  WebSocket.prototype.removeEventListener = function(type, listener, useCapture) {
-    if (!(type in this.__events)) return;
-    var events = this.__events[type];
-    for (var i = events.length - 1; i >= 0; --i) {
-      if (events[i] === listener) {
-        events.splice(i, 1);
-        break;
-      }
-    }
-  };
-
-  /**
-   * Implementation of {@link <a href="http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-registration">DOM 2 EventTarget Interface</a>}
-   *
-   * @param {Event} event
-   * @return void
-   */
-  WebSocket.prototype.dispatchEvent = function(event) {
-    var events = this.__events[event.type] || [];
-    for (var i = 0; i < events.length; ++i) {
-      events[i](event);
-    }
-    var handler = this["on" + event.type];
-    if (handler) handler(event);
-  };
-
-  /**
-   * Handles an event from Flash.
-   * @param {Object} flashEvent
-   */
-  WebSocket.prototype.__handleEvent = function(flashEvent) {
-    if ("readyState" in flashEvent) {
-      this.readyState = flashEvent.readyState;
-    }
-    if ("protocol" in flashEvent) {
-      this.protocol = flashEvent.protocol;
-    }
-    
-    var jsEvent;
-    if (flashEvent.type == "open" || flashEvent.type == "error") {
-      jsEvent = this.__createSimpleEvent(flashEvent.type);
-    } else if (flashEvent.type == "close") {
-      // TODO implement jsEvent.wasClean
-      jsEvent = this.__createSimpleEvent("close");
-    } else if (flashEvent.type == "message") {
-      var data = decodeURIComponent(flashEvent.message);
-      jsEvent = this.__createMessageEvent("message", data);
-    } else {
-      throw "unknown event type: " + flashEvent.type;
-    }
-    
-    this.dispatchEvent(jsEvent);
-  };
-  
-  WebSocket.prototype.__createSimpleEvent = function(type) {
-    if (document.createEvent && window.Event) {
-      var event = document.createEvent("Event");
-      event.initEvent(type, false, false);
-      return event;
-    } else {
-      return {type: type, bubbles: false, cancelable: false};
-    }
-  };
-  
-  WebSocket.prototype.__createMessageEvent = function(type, data) {
-    if (document.createEvent && window.MessageEvent && !window.opera) {
-      var event = document.createEvent("MessageEvent");
-      event.initMessageEvent("message", false, false, data, null, null, window, null);
-      return event;
-    } else {
-      // IE and Opera, the latter one truncates the data parameter after any 0x00 bytes.
-      return {type: type, data: data, bubbles: false, cancelable: false};
-    }
-  };
-  
-  /**
-   * Define the WebSocket readyState enumeration.
-   */
-  WebSocket.CONNECTING = 0;
-  WebSocket.OPEN = 1;
-  WebSocket.CLOSING = 2;
-  WebSocket.CLOSED = 3;
-
-  WebSocket.__flash = null;
-  WebSocket.__instances = {};
-  WebSocket.__tasks = [];
-  WebSocket.__nextId = 0;
-  
-  /**
-   * Load a new flash security policy file.
-   * @param {string} url
-   */
-  WebSocket.loadFlashPolicyFile = function(url){
-    WebSocket.__addTask(function() {
-      WebSocket.__flash.loadManualPolicyFile(url);
-    });
-  };
-
-  /**
-   * Loads WebSocketMain.swf and creates WebSocketMain object in Flash.
-   */
-  WebSocket.__initialize = function() {
-    if (WebSocket.__flash) return;
-    
-    if (WebSocket.__swfLocation) {
-      // For backword compatibility.
-      window.WEB_SOCKET_SWF_LOCATION = WebSocket.__swfLocation;
-    }
-    if (!window.WEB_SOCKET_SWF_LOCATION) {
-      console.error("[WebSocket] set WEB_SOCKET_SWF_LOCATION to location of WebSocketMain.swf");
-      return;
-    }
-    var container = document.createElement("div");
-    container.id = "webSocketContainer";
-    // Hides Flash box. We cannot use display: none or visibility: hidden because it prevents
-    // Flash from loading at least in IE. So we move it out of the screen at (-100, -100).
-    // But this even doesn't work with Flash Lite (e.g. in Droid Incredible). So with Flash
-    // Lite, we put it at (0, 0). This shows 1x1 box visible at left-top corner but this is
-    // the best we can do as far as we know now.
-    container.style.position = "absolute";
-    if (WebSocket.__isFlashLite()) {
-      container.style.left = "0px";
-      container.style.top = "0px";
-    } else {
-      container.style.left = "-100px";
-      container.style.top = "-100px";
-    }
-    var holder = document.createElement("div");
-    holder.id = "webSocketFlash";
-    container.appendChild(holder);
-    document.body.appendChild(container);
-    // See this article for hasPriority:
-    // http://help.adobe.com/en_US/as3/mobile/WS4bebcd66a74275c36cfb8137124318eebc6-7ffd.html
-    swfobject.embedSWF(
-      WEB_SOCKET_SWF_LOCATION,
-      "webSocketFlash",
-      "1" /* width */,
-      "1" /* height */,
-      "10.0.0" /* SWF version */,
-      null,
-      null,
-      {hasPriority: true, swliveconnect : true, allowScriptAccess: "always"},
-      null,
-      function(e) {
-        if (!e.success) {
-          console.error("[WebSocket] swfobject.embedSWF failed");
-        }
-      });
-  };
-  
-  /**
-   * Called by Flash to notify JS that it's fully loaded and ready
-   * for communication.
-   */
-  WebSocket.__onFlashInitialized = function() {
-    // We need to set a timeout here to avoid round-trip calls
-    // to flash during the initialization process.
-    setTimeout(function() {
-      WebSocket.__flash = document.getElementById("webSocketFlash");
-      WebSocket.__flash.setCallerUrl(location.href);
-      WebSocket.__flash.setDebug(!!window.WEB_SOCKET_DEBUG);
-      for (var i = 0; i < WebSocket.__tasks.length; ++i) {
-        WebSocket.__tasks[i]();
-      }
-      WebSocket.__tasks = [];
-    }, 0);
-  };
-  
-  /**
-   * Called by Flash to notify WebSockets events are fired.
-   */
-  WebSocket.__onFlashEvent = function() {
-    setTimeout(function() {
-      try {
-        // Gets events using receiveEvents() instead of getting it from event object
-        // of Flash event. This is to make sure to keep message order.
-        // It seems sometimes Flash events don't arrive in the same order as they are sent.
-        var events = WebSocket.__flash.receiveEvents();
-        for (var i = 0; i < events.length; ++i) {
-          WebSocket.__instances[events[i].webSocketId].__handleEvent(events[i]);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }, 0);
-    return true;
-  };
-  
-  // Called by Flash.
-  WebSocket.__log = function(message) {
-    console.log(decodeURIComponent(message));
-  };
-  
-  // Called by Flash.
-  WebSocket.__error = function(message) {
-    console.error(decodeURIComponent(message));
-  };
-  
-  WebSocket.__addTask = function(task) {
-    if (WebSocket.__flash) {
-      task();
-    } else {
-      WebSocket.__tasks.push(task);
-    }
-  };
-  
-  /**
-   * Test if the browser is running flash lite.
-   * @return {boolean} True if flash lite is running, false otherwise.
-   */
-  WebSocket.__isFlashLite = function() {
-    if (!window.navigator || !window.navigator.mimeTypes) {
-      return false;
-    }
-    var mimeType = window.navigator.mimeTypes["application/x-shockwave-flash"];
-    if (!mimeType || !mimeType.enabledPlugin || !mimeType.enabledPlugin.filename) {
-      return false;
-    }
-    return mimeType.enabledPlugin.filename.match(/flashlite/i) ? true : false;
-  };
-  
-  if (!window.WEB_SOCKET_DISABLE_AUTO_INITIALIZATION) {
-    if (window.addEventListener) {
-      window.addEventListener("load", function(){
-        WebSocket.__initialize();
-      }, false);
-    } else {
-      window.attachEvent("onload", function(){
-        WebSocket.__initialize();
-      });
-    }
-  }
-  
-})();
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io, global) {
-
-  /**
-   * Expose constructor.
-   *
-   * @api public
-   */
-  
-  exports.XHR = XHR;
-
-  /**
-   * XHR constructor
-   *
-   * @costructor
-   * @api public
-   */
-
-  function XHR (socket) {
-    if (!socket) return;
-
-    io.Transport.apply(this, arguments);
-    this.sendBuffer = [];
-  };
-
-  /**
-   * Inherits from Transport.
-   */
-
-  io.util.inherit(XHR, io.Transport);
-
-  /**
-   * Establish a connection
-   *
-   * @returns {Transport}
-   * @api public
-   */
-
-  XHR.prototype.open = function () {
-    this.socket.setBuffer(false);
-    this.onOpen();
-    this.get();
-
-    // we need to make sure the request succeeds since we have no indication
-    // whether the request opened or not until it succeeded.
-    this.setCloseTimeout();
-
-    return this;
-  };
-
-  /**
-   * Check if we need to send data to the Socket.IO server, if we have data in our
-   * buffer we encode it and forward it to the `post` method.
-   *
-   * @api private
-   */
-
-  XHR.prototype.payload = function (payload) {
-    var msgs = [];
-
-    for (var i = 0, l = payload.length; i < l; i++) {
-      msgs.push(io.parser.encodePacket(payload[i]));
-    }
-
-    this.send(io.parser.encodePayload(msgs));
-  };
-
-  /**
-   * Send data to the Socket.IO server.
-   *
-   * @param data The message
-   * @returns {Transport}
-   * @api public
-   */
-
-  XHR.prototype.send = function (data) {
-    this.post(data);
-    return this;
-  };
-
-  /**
-   * Posts a encoded message to the Socket.IO server.
-   *
-   * @param {String} data A encoded message.
-   * @api private
-   */
-
-  function empty () { };
-
-  XHR.prototype.post = function (data) {
-    var self = this;
-    this.socket.setBuffer(true);
-
-    function stateChange () {
-      if (this.readyState == 4) {
-        this.onreadystatechange = empty;
-        self.posting = false;
-
-        if (this.status == 200){
-          self.socket.setBuffer(false);
-        } else {
-          self.onClose();
-        }
-      }
-    }
-
-    function onload () {
-      this.onload = empty;
-      self.socket.setBuffer(false);
-    };
-
-    this.sendXHR = this.request('POST');
-
-    if (global.XDomainRequest && this.sendXHR instanceof XDomainRequest) {
-      this.sendXHR.onload = this.sendXHR.onerror = onload;
-    } else {
-      this.sendXHR.onreadystatechange = stateChange;
-    }
-
-    this.sendXHR.send(data);
-  };
-
-  /**
-   * Disconnects the established `XHR` connection.
-   *
-   * @returns {Transport} 
-   * @api public
-   */
-
-  XHR.prototype.close = function () {
-    this.onClose();
-    return this;
-  };
-
-  /**
-   * Generates a configured XHR request
-   *
-   * @param {String} url The url that needs to be requested.
-   * @param {String} method The method the request should use.
-   * @returns {XMLHttpRequest}
-   * @api private
-   */
-
-  XHR.prototype.request = function (method) {
-    var req = io.util.request(this.socket.isXDomain())
-      , query = io.util.query(this.socket.options.query, 't=' + +new Date);
-
-    req.open(method || 'GET', this.prepareUrl() + query, true);
-
-    if (method == 'POST') {
-      try {
-        if (req.setRequestHeader) {
-          req.setRequestHeader('Content-type', 'text/plain;charset=UTF-8');
-        } else {
-          // XDomainRequest
-          req.contentType = 'text/plain';
-        }
-      } catch (e) {}
-    }
-
-    return req;
-  };
-
-  /**
-   * Returns the scheme to use for the transport URLs.
-   *
-   * @api private
-   */
-
-  XHR.prototype.scheme = function () {
-    return this.socket.options.secure ? 'https' : 'http';
-  };
-
-  /**
-   * Check if the XHR transports are supported
-   *
-   * @param {Boolean} xdomain Check if we support cross domain requests.
-   * @returns {Boolean}
-   * @api public
-   */
-
-  XHR.check = function (socket, xdomain) {
-    try {
-      if (io.util.request(xdomain)) {
-        return true;
-      }
-    } catch(e) {}
-
-    return false;
-  };
-
-  /**
-   * Check if the XHR transport supports corss domain requests.
-   * 
-   * @returns {Boolean}
-   * @api public
-   */
-
-  XHR.xdomainCheck = function () {
-    return XHR.check(null, true);
-  };
-
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-  , this
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports.htmlfile = HTMLFile;
-
-  /**
-   * The HTMLFile transport creates a `forever iframe` based transport
-   * for Internet Explorer. Regular forever iframe implementations will 
-   * continuously trigger the browsers buzy indicators. If the forever iframe
-   * is created inside a `htmlfile` these indicators will not be trigged.
-   *
-   * @constructor
-   * @extends {io.Transport.XHR}
-   * @api public
-   */
-
-  function HTMLFile (socket) {
-    io.Transport.XHR.apply(this, arguments);
-  };
-
-  /**
-   * Inherits from XHR transport.
-   */
-
-  io.util.inherit(HTMLFile, io.Transport.XHR);
-
-  /**
-   * Transport name
-   *
-   * @api public
-   */
-
-  HTMLFile.prototype.name = 'htmlfile';
-
-  /**
-   * Creates a new ActiveX `htmlfile` with a forever loading iframe
-   * that can be used to listen to messages. Inside the generated
-   * `htmlfile` a reference will be made to the HTMLFile transport.
-   *
-   * @api private
-   */
-
-  HTMLFile.prototype.get = function () {
-    this.doc = new ActiveXObject('htmlfile');
-    this.doc.open();
-    this.doc.write('<html></html>');
-    this.doc.close();
-    this.doc.parentWindow.s = this;
-
-    var iframeC = this.doc.createElement('div');
-    iframeC.className = 'socketio';
-
-    this.doc.body.appendChild(iframeC);
-    this.iframe = this.doc.createElement('iframe');
-
-    iframeC.appendChild(this.iframe);
-
-    var self = this
-      , query = io.util.query(this.socket.options.query, 't='+ +new Date);
-
-    this.iframe.src = this.prepareUrl() + query;
-
-    io.util.on(window, 'unload', function () {
-      self.destroy();
-    });
-  };
-
-  /**
-   * The Socket.IO server will write script tags inside the forever
-   * iframe, this function will be used as callback for the incoming
-   * information.
-   *
-   * @param {String} data The message
-   * @param {document} doc Reference to the context
-   * @api private
-   */
-
-  HTMLFile.prototype._ = function (data, doc) {
-    this.onData(data);
-    try {
-      var script = doc.getElementsByTagName('script')[0];
-      script.parentNode.removeChild(script);
-    } catch (e) { }
-  };
-
-  /**
-   * Destroy the established connection, iframe and `htmlfile`.
-   * And calls the `CollectGarbage` function of Internet Explorer
-   * to release the memory.
-   *
-   * @api private
-   */
-
-  HTMLFile.prototype.destroy = function () {
-    if (this.iframe){
-      try {
-        this.iframe.src = 'about:blank';
-      } catch(e){}
-
-      this.doc = null;
-      this.iframe.parentNode.removeChild(this.iframe);
-      this.iframe = null;
-
-      CollectGarbage();
-    }
-  };
-
-  /**
-   * Disconnects the established connection.
-   *
-   * @returns {Transport} Chaining.
-   * @api public
-   */
-
-  HTMLFile.prototype.close = function () {
-    this.destroy();
-    return io.Transport.XHR.prototype.close.call(this);
-  };
-
-  /**
-   * Checks if the browser supports this transport. The browser
-   * must have an `ActiveXObject` implementation.
-   *
-   * @return {Boolean}
-   * @api public
-   */
-
-  HTMLFile.check = function () {
-    if ('ActiveXObject' in window){
-      try {
-        var a = new ActiveXObject('htmlfile');
-        return a && io.Transport.XHR.check();
-      } catch(e){}
-    }
-    return false;
-  };
-
-  /**
-   * Check if cross domain requests are supported.
-   *
-   * @returns {Boolean}
-   * @api public
-   */
-
-  HTMLFile.xdomainCheck = function () {
-    // we can probably do handling for sub-domains, we should
-    // test that it's cross domain but a subdomain here
-    return false;
-  };
-
-  /**
-   * Add the transport to your public io.transports array.
-   *
-   * @api private
-   */
-
-  io.transports.push('htmlfile');
-
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io, global) {
-
-  /**
-   * Expose constructor.
-   */
-
-  exports['xhr-polling'] = XHRPolling;
-
-  /**
-   * The XHR-polling transport uses long polling XHR requests to create a
-   * "persistent" connection with the server.
-   *
-   * @constructor
-   * @api public
-   */
-
-  function XHRPolling () {
-    io.Transport.XHR.apply(this, arguments);
-  };
-
-  /**
-   * Inherits from XHR transport.
-   */
-
-  io.util.inherit(XHRPolling, io.Transport.XHR);
-
-  /**
-   * Merge the properties from XHR transport
-   */
-
-  io.util.merge(XHRPolling, io.Transport.XHR);
-
-  /**
-   * Transport name
-   *
-   * @api public
-   */
-
-  XHRPolling.prototype.name = 'xhr-polling';
-
-  /** 
-   * Establish a connection, for iPhone and Android this will be done once the page
-   * is loaded.
-   *
-   * @returns {Transport} Chaining.
-   * @api public
-   */
-
-  XHRPolling.prototype.open = function () {
-    var self = this;
-
-    io.Transport.XHR.prototype.open.call(self);
-    return false;
-  };
-
-  /**
-   * Starts a XHR request to wait for incoming messages.
-   *
-   * @api private
-   */
-
-  function empty () {};
-
-  XHRPolling.prototype.get = function () {
-    if (!this.open) return;
-
-    var self = this;
-
-    function stateChange () {
-      if (this.readyState == 4) {
-        this.onreadystatechange = empty;
-
-        if (this.status == 200) {
-          self.onData(this.responseText);
-          self.get();
-        } else {
-          self.onClose();
-        }
-      }
-    };
-
-    function onload () {
-      this.onload = empty;
-      self.onData(this.responseText);
-      self.get();
-    };
-
-    this.xhr = this.request();
-
-    if (global.XDomainRequest && this.xhr instanceof XDomainRequest) {
-      this.xhr.onload = this.xhr.onerror = onload;
-    } else {
-      this.xhr.onreadystatechange = stateChange;
-    }
-
-    this.xhr.send(null);
-  };
-
-  /**
-   * Handle the unclean close behavior.
-   *
-   * @api private
-   */
-
-  XHRPolling.prototype.onClose = function () {
-    io.Transport.XHR.prototype.onClose.call(this);
-
-    if (this.xhr) {
-      this.xhr.onreadystatechange = this.xhr.onload = empty;
-      try {
-        this.xhr.abort();
-      } catch(e){}
-      this.xhr = null;
-    }
-  };
-
-  /**
-   * Webkit based browsers show a infinit spinner when you start a XHR request
-   * before the browsers onload event is called so we need to defer opening of
-   * the transport until the onload event is called. Wrapping the cb in our
-   * defer method solve this.
-   *
-   * @param {Socket} socket The socket instance that needs a transport
-   * @param {Function} fn The callback
-   * @api private
-   */
-
-  XHRPolling.prototype.ready = function (socket, fn) {
-    var self = this;
-
-    io.util.defer(function () {
-      fn.call(self);
-    });
-  };
-
-  /**
-   * Add the transport to your public io.transports array.
-   *
-   * @api private
-   */
-
-  io.transports.push('xhr-polling');
-
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-  , this
-);
-
-/**
- * socket.io
- * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
- * MIT Licensed
- */
-
-(function (exports, io, global) {
-  /**
-   * There is a way to hide the loading indicator in Firefox. If you create and
-   * remove a iframe it will stop showing the current loading indicator.
-   * Unfortunately we can't feature detect that and UA sniffing is evil.
-   *
-   * @api private
-   */
-
-  var indicator = global.document && "MozAppearance" in
-    global.document.documentElement.style;
-
-  /**
-   * Expose constructor.
-   */
-
-  exports['jsonp-polling'] = JSONPPolling;
-
-  /**
-   * The JSONP transport creates an persistent connection by dynamically
-   * inserting a script tag in the page. This script tag will receive the
-   * information of the Socket.IO server. When new information is received
-   * it creates a new script tag for the new data stream.
-   *
-   * @constructor
-   * @extends {io.Transport.xhr-polling}
-   * @api public
-   */
-
-  function JSONPPolling (socket) {
-    io.Transport['xhr-polling'].apply(this, arguments);
-
-    this.index = io.j.length;
-
-    var self = this;
-
-    io.j.push(function (msg) {
-      self._(msg);
-    });
-  };
-
-  /**
-   * Inherits from XHR polling transport.
-   */
-
-  io.util.inherit(JSONPPolling, io.Transport['xhr-polling']);
-
-  /**
-   * Transport name
-   *
-   * @api public
-   */
-
-  JSONPPolling.prototype.name = 'jsonp-polling';
-
-  /**
-   * Posts a encoded message to the Socket.IO server using an iframe.
-   * The iframe is used because script tags can create POST based requests.
-   * The iframe is positioned outside of the view so the user does not
-   * notice it's existence.
-   *
-   * @param {String} data A encoded message.
-   * @api private
-   */
-
-  JSONPPolling.prototype.post = function (data) {
-    var self = this
-      , query = io.util.query(
-             this.socket.options.query
-          , 't='+ (+new Date) + '&i=' + this.index
-        );
-
-    if (!this.form) {
-      var form = document.createElement('form')
-        , area = document.createElement('textarea')
-        , id = this.iframeId = 'socketio_iframe_' + this.index
-        , iframe;
-
-      form.className = 'socketio';
-      form.style.position = 'absolute';
-      form.style.top = '-1000px';
-      form.style.left = '-1000px';
-      form.target = id;
-      form.method = 'POST';
-      form.setAttribute('accept-charset', 'utf-8');
-      area.name = 'd';
-      form.appendChild(area);
-      document.body.appendChild(form);
-
-      this.form = form;
-      this.area = area;
-    }
-
-    this.form.action = this.prepareUrl() + query;
-
-    function complete () {
-      initIframe();
-      self.socket.setBuffer(false);
-    };
-
-    function initIframe () {
-      if (self.iframe) {
-        self.form.removeChild(self.iframe);
-      }
-
-      try {
-        // ie6 dynamic iframes with target="" support (thanks Chris Lambacher)
-        iframe = document.createElement('<iframe name="'+ self.iframeId +'">');
-      } catch (e) {
-        iframe = document.createElement('iframe');
-        iframe.name = self.iframeId;
-      }
-
-      iframe.id = self.iframeId;
-
-      self.form.appendChild(iframe);
-      self.iframe = iframe;
-    };
-
-    initIframe();
-
-    // we temporarily stringify until we figure out how to prevent
-    // browsers from turning `\n` into `\r\n` in form inputs
-    this.area.value = io.JSON.stringify(data);
-
-    try {
-      this.form.submit();
-    } catch(e) {}
-
-    if (this.iframe.attachEvent) {
-      iframe.onreadystatechange = function () {
-        if (self.iframe.readyState == 'complete') {
-          complete();
-        }
-      };
-    } else {
-      this.iframe.onload = complete;
-    }
-
-    this.socket.setBuffer(true);
-  };
-  
-  /**
-   * Creates a new JSONP poll that can be used to listen
-   * for messages from the Socket.IO server.
-   *
-   * @api private
-   */
-
-  JSONPPolling.prototype.get = function () {
-    var self = this
-      , script = document.createElement('script')
-      , query = io.util.query(
-             this.socket.options.query
-          , 't='+ (+new Date) + '&i=' + this.index
-        );
-
-    if (this.script) {
-      this.script.parentNode.removeChild(this.script);
-      this.script = null;
-    }
-
-    script.async = true;
-    script.src = this.prepareUrl() + query;
-    script.onerror = function () {
-      self.onClose();
-    };
-
-    var insertAt = document.getElementsByTagName('script')[0]
-    insertAt.parentNode.insertBefore(script, insertAt);
-    this.script = script;
-
-    if (indicator) {
-      setTimeout(function () {
-        var iframe = document.createElement('iframe');
-        document.body.appendChild(iframe);
-        document.body.removeChild(iframe);
-      }, 100);
-    }
-  };
-
-  /**
-   * Callback function for the incoming message stream from the Socket.IO server.
-   *
-   * @param {String} data The message
-   * @api private
-   */
-
-  JSONPPolling.prototype._ = function (msg) {
-    this.onData(msg);
-    if (this.open) {
-      this.get();
-    }
-    return this;
-  };
-
-  /**
-   * The indicator hack only works after onload
-   *
-   * @param {Socket} socket The socket instance that needs a transport
-   * @param {Function} fn The callback
-   * @api private
-   */
-
-  JSONPPolling.prototype.ready = function (socket, fn) {
-    var self = this;
-    if (!indicator) return fn.call(this);
-
-    io.util.load(function () {
-      fn.call(self);
-    });
-  };
-
-  /**
-   * Checks if browser supports this transport.
-   *
-   * @return {Boolean}
-   * @api public
-   */
-
-  JSONPPolling.check = function () {
-    return 'document' in global;
-  };
-
-  /**
-   * Check if cross domain requests are supported
-   *
-   * @returns {Boolean}
-   * @api public
-   */
-
-  JSONPPolling.xdomainCheck = function () {
-    return true;
-  };
-
-  /**
-   * Add the transport to your public io.transports array.
-   *
-   * @api private
-   */
-
-  io.transports.push('jsonp-polling');
-
-})(
-    'undefined' != typeof io ? io.Transport : module.exports
-  , 'undefined' != typeof io ? io : module.parent.exports
-  , this
-);
-;
-    }).call(module.exports);
-    
-    __require.modules["/node_modules/socket.io-client/dist/socket.io.js"]._cached = module.exports;
-    return module.exports;
-};
-
-require.modules["/lib/segment/hop-stop-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/hop-stop-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/hop-stop-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var Segment = require('../segment');
-
-var HopStopSegment = module.exports = function() {};
-HopStopSegment.prototype = new Segment();
-
-HopStopSegment.prototype.durationInMinutes = function() {
-  if(this.duration)
-    return this.duration / 60;
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/hop-stop-segment.js"]._cached = module.exports;
-    return module.exports;
-};
-
-require.modules["/lib/segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment.js"]._cached = module.exports;
-    
-    (function () {
-        var Segment = module.exports = function() {};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment.js"]._cached = module.exports;
-    return module.exports;
-};
-
-require.modules["/lib/segment/bicycling-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/bicycling-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/bicycling-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    Segment = require('../segment');
-
-var BicyclingSegment = module.exports = function(index, step) {
+Segment.prototype.init = function(index, step) {
   this.index = index;
-  this.distance = parseFloat(step.distance.value) / 1000.0;
+  if(step.distance)
+    this.distance = parseFloat(step.distance.value) / 1000.0;
   if(step.duration)
     this.duration = step.duration.value;
   this.instructions = step.instructions;
+};
+
+module.exports = Segment;
+
+});
+
+require.define("/lib/segment/bicycling-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
+
+var BicyclingSegment = module.exports = function(index, step) {
+  this.init(index, step);
   this.mode = 'BICYCLING';
 }
 BicyclingSegment.prototype = new Segment();
@@ -6574,128 +4080,50 @@ BicyclingSegment.prototype.getImpacts = function(callback) {
   });
   callback(null, estimate);
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/bicycling-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/bussing-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/bussing-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/bussing-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    HopStopSegment = require('./hop-stop-segment');
+});
+
+require.define("/lib/segment/bussing-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
 
 var BussingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.bus_class = 'city transit';
   this.mode = 'BUSSING';
 }
-BussingSegment.prototype = new HopStopSegment();
+BussingSegment.prototype = new Segment();
 
 CM1.extend(BussingSegment, {
   model: 'bus_trip',
-  provides: ['distance', 'bus_class', { 'duration': 'durationInMinutes' }]
+  provides: ['distance', 'bus_class']
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/bussing-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/commuter-railing-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/commuter-railing-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/commuter-railing-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    HopStopSegment = require('./hop-stop-segment');
+});
+
+require.define("/lib/segment/commuter-railing-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
 
 var CommuterRailingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.rail_class = 'commuter rail';
 }
-CommuterRailingSegment.prototype = new HopStopSegment();
+CommuterRailingSegment.prototype = new Segment();
 
 CM1.extend(CommuterRailingSegment, {
   model: 'rail_trip',
-  provides: ['duration', 'rail_class', { 'distance_estimate': 'distance' }]
+  provides: ['distance', 'rail_class']
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/commuter-railing-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/driving-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/driving-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/driving-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
+});
+
+require.define("/lib/segment/driving-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
     Segment = require('../segment');
 
 var DrivingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.mode = 'DRIVING';
 }
 DrivingSegment.prototype = new Segment();
@@ -6704,39 +4132,15 @@ CM1.extend(DrivingSegment, {
   model: 'automobile_trip',
   provides: ['distance']
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/driving-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/flying-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/flying-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/flying-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
+});
+
+require.define("/lib/segment/flying-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
     Segment = require('../segment');
 
 var FlyingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.trips = 1;
   this.mode = 'FLYING';
 }
@@ -6746,128 +4150,50 @@ CM1.extend(FlyingSegment, {
   model: 'flight',
   provides: ['trips', { 'distance_estimate': 'distance' }]
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/flying-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/light-railing-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/light-railing-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/light-railing-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    HopStopSegment = require('./hop-stop-segment');
+});
+
+require.define("/lib/segment/light-railing-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
 
 var LightRailingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.rail_class = 'light rail';
 }
-LightRailingSegment.prototype = new HopStopSegment();
+LightRailingSegment.prototype = new Segment();
 
 CM1.extend(LightRailingSegment, {
   model: 'rail_trip',
   provides: ['duration', 'rail_class', { 'distance_estimate': 'distance' }]
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/light-railing-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/subwaying-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/subwaying-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/subwaying-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
-    HopStopSegment = require('./hop-stop-segment');
+});
+
+require.define("/lib/segment/subwaying-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
+    Segment = require('../segment');
 
 var SubwayingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.rail_class = 'heavy rail';
   this.mode = 'SUBWAYING';
 }
-SubwayingSegment.prototype = new HopStopSegment();
+SubwayingSegment.prototype = new Segment();
 
 CM1.extend(SubwayingSegment, {
   model: 'rail_trip',
-  provides: ['duration', 'rail_class', { 'distance_estimate': 'distance' }]
+  provides: ['rail_class', 'distance']
 });
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/subwaying-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/segment/walking-segment.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/segment";
-    var __filename = "/lib/segment/walking-segment.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/segment");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/segment");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/segment/walking-segment.js"]._cached = module.exports;
-    
-    (function () {
-        var CM1 = require('CM1'),
+});
+
+require.define("/lib/segment/walking-segment.js", function (require, module, exports, __dirname, __filename) {
+var CM1 = require('CM1'),
     Segment = require('../segment');
 
 var WalkingSegment = module.exports = function(index, step) {
-  this.index = index;
-  if(step.distance)
-    this.distance = parseFloat(step.distance.value) / 1000.0;
-  if(step.duration)
-    this.duration = step.duration.value;
-  this.instructions = step.instructions;
+  this.init(index, step);
   this.mode = 'WALKING';
 };
 WalkingSegment.prototype = new Segment();
@@ -6879,32 +4205,11 @@ WalkingSegment.prototype.getImpacts = function(callback) {
   });
   callback(null, estimate);
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/segment/walking-segment.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/time-formatter.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/time-formatter.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/time-formatter.js"]._cached = module.exports;
-    
-    (function () {
-        var TimeFormatter = module.exports = {
+});
+
+require.define("/lib/time-formatter.js", function (require, module, exports, __dirname, __filename) {
+var TimeFormatter = module.exports = {
   format: function(seconds) {
     if(seconds == 0)
       return '';
@@ -6939,149 +4244,50 @@ require.modules["/lib/time-formatter.js"] = function () {
     return result;
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/time-formatter.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions/google-directions-route.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/google-directions-route.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/google-directions-route.js"]._cached = module.exports;
-    
-    (function () {
-        var GoogleDirectionsRoute = module.exports = function(hopstopData) {
-  this.hopstopData = hopstopData;
-  this.copyrights = 'Copyright HopStop.com, Inc.';
-  this.overview_path = GoogleDirectionsRoute.generateOverviewPath(hopstopData.steps);
-  this.legs = [{
-    duration: { value: this.hopstopData.duration },
-    start_address: '',
-    start_location: this.overview_path[0],
-    end_address: '',
-    end_location: this.overview_path[this.overview_path.length - 1],
-    steps: GoogleDirectionsRoute.generateSteps(this.hopstopData.steps),
-    via_waypoints: []
-  }];
-  this.warnings = [];
-  this.bounds = GoogleDirectionsRoute.generateBounds(this.hopstopData.steps);
-};
+});
 
-GoogleDirectionsRoute.generateOverviewPath = function(steps) {
-  var path = [];
-  for(i in steps) {
-    var step = steps[i];
-    if(step.start_location) {
-      var startLatLng = new google.maps.LatLng(
-        step.start_location.lat, step.start_location.lon );
-      path.push(startLatLng);
-      var endLatLng = new google.maps.LatLng(
-          step.end_location.lat, step.end_location.lon);
-      path.push(endLatLng);
+require.define("/lib/directions/google-directions-route.js", function (require, module, exports, __dirname, __filename) {
+var _ = require('underscore');
+
+var GoogleDirectionsRoute = {
+  generateBounds: function(pairs) {
+    var corners = {};
+
+    _.each(pairs, function(pair) {
+      corners = GoogleDirectionsRoute.recordCoords(pair, corners);
+    });
+
+    if(corners.sWLat != null && corners.sWLng != null && 
+       corners.nELat != null && corners.nELng != null) {
+      var southWest = new google.maps.LatLng(corners.sWLat, corners.sWLng);
+      var northEast = new google.maps.LatLng(corners.nELat, corners.nELng);
+      return new google.maps.LatLngBounds(southWest, northEast);
+    } else {
+      return null;
     }
-  }
+  },
 
-  return path;
-};
-
-GoogleDirectionsRoute.generateBounds = function(steps) {
-  var coords = {};
-
-  for(i in steps) {
-    var step = steps[i];
-    coords = GoogleDirectionsRoute.recordCoords(step.start_location, coords);
-    coords = GoogleDirectionsRoute.recordCoords(step.end_location, coords);
-  }
-
-  if(coords.sWLat != null && coords.sWLng != null && 
-     coords.nELat != null && coords.nELng != null) {
-    var southWest = new google.maps.LatLng(coords.sWLat, coords.sWLng);
-    var northEast = new google.maps.LatLng(coords.nELat, coords.nELng);
-    return new google.maps.LatLngBounds(southWest, northEast);
-  } else {
-    return null;
-  }
-};
-
-GoogleDirectionsRoute.recordCoords = function(location, coords) {
-  if(location) {
-    var lat = location.lat;
-    var lng = location.lon;
-    coords.sWLat = (coords.sWLat == null ? lat : Math.min(coords.sWLat, lat));
-    coords.sWLng = (coords.sWLng == null ? lng : Math.min(coords.sWLng, lng));
-    coords.nELat = (coords.nELat == null ? lat : Math.max(coords.nELat, lat));
-    coords.nELng = (coords.nELng == null ? lng : Math.max(coords.nELng, lng));
-  }
-
-  return coords;
-};
-
-GoogleDirectionsRoute.generateSteps = function(steps) {
-  var googleSteps = [];
-
-  for(i in steps) {
-    var step = steps[i];
-    var googleStep = {};
-
-    googleStep.duration = step.duration;
-    googleStep.instructions = step.instructions;
-    googleStep.travel_mode = step.travel_mode;
-    googleStep.path = [];
-
-    if(step.start_location) {
-      googleStep.start_location = new google.maps.LatLng(step.start_location.lat, step.start_location.lon);
-      googleStep.path.push(googleStep.start_location);
-    }
-    if(step.end_location) {
-      googleStep.end_location = new google.maps.LatLng(step.end_location.lat, step.end_location.lon);
-      googleStep.path.push(googleStep.end_location);
+  recordCoords: function(location, corners) {
+    if(location) {
+      var lat = location.lat();
+      var lng = location.lng();
+      corners.sWLat = (corners.sWLat == null ? lat : Math.min(corners.sWLat, lat));
+      corners.sWLng = (corners.sWLng == null ? lng : Math.min(corners.sWLng, lng));
+      corners.nELat = (corners.nELat == null ? lat : Math.max(corners.nELat, lat));
+      corners.nELng = (corners.nELng == null ? lng : Math.max(corners.nELng, lng));
     }
 
-    googleSteps.push(googleStep);
-  }
-
-  return googleSteps;
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/google-directions-route.js"]._cached = module.exports;
-    return module.exports;
+    return corners;
+  },
 };
 
-require.modules["/lib/number-formatter.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/number-formatter.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/number-formatter.js"]._cached = module.exports;
-    
-    (function () {
-        var NumberFormatter = module.exports  = {
+module.exports = GoogleDirectionsRoute;
+
+});
+
+require.define("/lib/number-formatter.js", function (require, module, exports, __dirname, __filename) {
+var NumberFormatter = module.exports  = {
   kilogramsToPounds: function(num, significantDigits) {
     if(!significantDigits) significantDigits = 2;
     var magnitude = Math.pow(10.0, significantDigits);
@@ -7091,32 +4297,11 @@ require.modules["/lib/number-formatter.js"] = function () {
     return (Math.round((num / 1609.3) * 100) / 100);
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/number-formatter.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions/google-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/google-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/google-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions');
+});
+
+require.define("/lib/directions/google-directions.js", function (require, module, exports, __dirname, __filename) {
+var Directions = require('../directions');
 
 var GoogleDirections = module.exports = function(origin, destination, mode) {
   this.origin = origin
@@ -7172,42 +4357,195 @@ GoogleDirections.events = {
     };
   }
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/google-directions.js"]._cached = module.exports;
-    return module.exports;
+
+});
+
+require.define("/lib/directions/mapquest-directions.js", function (require, module, exports, __dirname, __filename) {
+var Directions = require('../directions'),
+    DirectionsEvents = require('../directions-events'),
+    GoogleDirectionsRoute = require('./google-directions-route'),
+    WalkingSegment = require('../segment/walking-segment'),
+    MapquestApi = require('../mapquest-api');
+
+var async = require('async'),
+    _ = require('underscore');
+
+var MapquestDirections = module.exports = function(origin, destination, mode, when) {
+  this.origin = origin;
+  this.destination = destination;
+  this.mode = mode || 'PUBLICTRANSIT';
+  this.when = when || 'now';
+  this.geocoder = new google.maps.Geocoder();
+  this.parameters = {};
+}
+MapquestDirections.prototype = new Directions();
+
+MapquestDirections.events = new DirectionsEvents();
+
+MapquestDirections.prototype.route = function(callback) {
+  var directions = this;
+
+  async.parallel({
+    origin: MapquestDirections.events.geocode(this, 'origin', 'originLatLng'),
+    destination: MapquestDirections.events.geocode(this, 'destination', 'destinationLatLng')
+  }, function(err, geocodes) {
+    if(err) callback(err, directions);
+
+    directions.fetchMapquest(callback);
+  });
 };
 
-require.modules["/lib/directions/hop-stop-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/hop-stop-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
+MapquestDirections.prototype.originLatLngString = function() {
+  return this.originLatLng.lat() + ',' + this.originLatLng.lng();
+};
+MapquestDirections.prototype.destinationLatLngString = function() {
+  return this.destinationLatLng.lat() + ',' + this.destinationLatLng.lng();
+};
+
+MapquestDirections.prototype.fetchMapquest = function(callback) {
+  MapquestApi.fetch(this.originLatLngString(), this.destinationLatLngString(),
+    MapquestDirections.events.processMapquest(this, callback));
+};
+
+MapquestDirections.translateRoute = function(result) {
+  var route = {
+    copyrights: result.info.copyright.text,
+    overview_path: MapquestDirections.generateOverviewPath(result.route.shape.shapePoints)
+  };
+  route.legs = [{
+    duration: { value: result.route.time },
+    distance: { value: result.route.distance * 1.609344 }, // mi => km
+    start_address: '',
+    start_location: _.first(route.overview_path),
+    end_address: '',
+    end_location: _.last(route.overview_path),
+    steps: MapquestDirections.generateGoogleSteps(
+        result.route.legs[0].maneuvers,
+        result.route.shape.maneuverIndexes,
+        route.overview_path),
+    via_waypoints: []
+  }];
+  route.warnings = [];
+  route.bounds = MapquestDirections.generateBounds(result.route.boundingBox);
+
+  this.distance = route.legs[0].distance.value;
+  this.distanceInMeters = this.distance * 1000;
+
+  return { routes: [route] };
+};
+
+MapquestDirections.generateOverviewPath = function(decimals) {
+  var path = [];
+  var lat;
+  _.each(decimals, function(decimal, i) {
+    if(i % 2 == 0) {
+      lat = decimal;
+    } else {
+      path.push(new google.maps.LatLng(lat, decimal));
+    }
+  });
+
+  return path;
+};
+
+MapquestDirections.generateGoogleSteps = function(maneuvers, pathIndexes, overviewPath) {
+  return _.map(maneuvers, function(maneuver, i) {
+    var startIndex = pathIndexes[i] / 2,
+        stopIndex = (pathIndexes[i + 1] - 2) / 2,
+        chunk = _.filter(overviewPath, function(latLng, i) {
+          return startIndex <= i && i <= (stopIndex || overviewPath.length);
+        });
+
+    return {
+      duration: { value: maneuver.time },
+      distance: { value: maneuver.distance * 1609.344 },  // mi => m
+      instructions: maneuver.narrative,
+      travel_mode: maneuver.transportMode,
+      path: chunk
     };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/hop-stop-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions'),
+  });
+};
+
+MapquestDirections.generateBounds = function(boundingBox) {
+  var southWest = new google.maps.LatLng(boundingBox.lr.lat, boundingBox.ul.lng),
+      northEast = new google.maps.LatLng(boundingBox.ul.lat, boundingBox.lr.lng);
+
+  return new google.maps.LatLngBounds(southWest, northEast);
+};
+
+
+// Events
+
+MapquestDirections.events.processMapquest = function(directions, callback) {
+  return function(err, route) {
+    if(err) return callback(err, directions);
+    if(route.info.statuscode >= 400)
+      return callback(new Error('No viable transit route.'), directions);
+
+    var directionsRoute = MapquestDirections.translateRoute(route);
+    directions.storeRoute(directionsRoute);
+
+    err = null;
+    if(directions.isAllWalkingSegments()) {
+      err = new MapquestDirections.AllWalkingSegmentsError('Invalid Mapquest route: all segments are walking segments');
+    }
+    callback(err, directions);
+  };
+};
+
+});
+
+require.define("/lib/mapquest-api.js", function (require, module, exports, __dirname, __filename) {
+var http = require('http'),
+    JSON = require('JSON'),
+    querystring = require('querystring');
+
+var MapquestApi = {
+  fetch: function(from, to, callback) {
+    var query = querystring.stringify({
+      from: from, to: to
+    });
+    var request = http.request({
+      path: '/mapquest?' + query,
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    }, function (response) {
+      if(response.statusCode >= 300) {
+        callback(new Error('HTTP request for Hopstop failed: ' + response.statusCode));
+      } else {
+        var data = '';
+        response.on('data', function (buf) {
+          data += buf;
+        });
+        response.on('error', function() { callback('HTTP request for Hopstop failed: ' + data) });
+
+        response.on('end', function () {
+          var json = JSON.parse(data);
+          callback(null, json);
+        });
+      }
+    });
+    request.end();
+  }
+};
+
+module.exports = MapquestApi;
+
+});
+
+require.define("/lib/directions/hop-stop-directions.js", function (require, module, exports, __dirname, __filename) {
+var _ = require('underscore');
+
+var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
     DirectBusDirections = require('./direct-bus-directions'),
     DirectRailDirections = require('./direct-rail-directions'),
     GoogleDirectionsRoute = require('./google-directions-route'),
     HootrootApi = require('../hootroot-api'),
     WalkingSegment = require('../segment/walking-segment');
-var async = require('async'),
-    http = require('http');
+var async = require('async');
 
-var HopStopDirections = module.exports = function(origin, destination, mode, when) {
+var HopStopDirections = function(origin, destination, mode, when) {
   this.origin = origin;
   this.destination = destination;
   this.mode = mode || 'PUBLICTRANSIT';
@@ -7227,8 +4565,9 @@ HopStopDirections.events = new DirectionsEvents();
 
 HopStopDirections.shouldDefaultTransitToDirectRoute = function(err) {
   err = err ? err : false;
-  var walkingError = (err && err.name == 'AllWalkingSegmentsError');
-  return (walkingError && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
+  var walkingError = (err && err.name == 'AllWalkingSegmentsError'),
+      hopStopError = (err && err.name == 'HopStopError');
+  return ((walkingError || hopStopError) && process.env.TRANSIT_DIRECT_DEFAULT.toString() == 'true');
 };
 
 HopStopDirections.prototype.route = function(callback) {
@@ -7243,21 +4582,26 @@ HopStopDirections.prototype.route = function(callback) {
     origin: HopStopDirections.events.geocode(this, 'origin', 'originLatLng'),
     destination: HopStopDirections.events.geocode(this, 'destination', 'destinationLatLng')
   }, function(err, geocodes) {
-    if(err) {
-      callback(err, directions);
-    } else {
-      async.series({ hopstop: HopStopDirections.events.fetchHopStop(directions) },
-        HopStopDirections.events.processHopStop(directions, callback));
-    }
+    if(err) callback(err, directions);
+
+    directions.fetchHopStop(callback);
   });
 };
 
-HopStopDirections.prototype.isAllWalkingSegments = function() {
-  var result = true;
-  this.eachSegment(function(segment) {
-    result = result && segment instanceof WalkingSegment;
-  });
-  return result;
+HopStopDirections.prototype.params = function() {
+  return {
+    x1: this.originLatLng.lng(), 
+    y1: this.originLatLng.lat(), 
+    x2: this.destinationLatLng.lng(), 
+    y2: this.destinationLatLng.lat(), 
+    mode: this.mode,
+    when: this.when
+  };
+};
+
+HopStopDirections.prototype.fetchHopStop = function(callback) {
+  HootrootApi.hopstop(this.params(),
+    HopStopDirections.events.processHopStop(this, callback));
 };
 
 HopStopDirections.prototype.calculateDistance = function() {
@@ -7266,30 +4610,77 @@ HopStopDirections.prototype.calculateDistance = function() {
   this.distance = this.distanceInMeters / 1000;
 };
 
+HopStopDirections.translateRoute = function(hopstopData) {
+  var route = {
+    hopstopData: hopstopData,
+    copyrights: 'Copyright HopStop.com, Inc.',
+    overview_path: HopStopDirections.generateOverviewPath(hopstopData.steps)
+  };
+  route.legs = [{
+    duration: { value: hopstopData.duration },
+    start_address: '',
+    start_location: route.overview_path[0],
+    end_address: '',
+    end_location: route.overview_path[route.overview_path.length - 1],
+    steps: HopStopDirections.generateGoogleSteps(hopstopData.steps),
+    via_waypoints: []
+  }];
+  route.warnings = [];
+  route.bounds = GoogleDirectionsRoute.generateBounds(route.overview_path);
+
+  return { routes: [route] };
+};
+
+HopStopDirections.generateOverviewPath = function(steps) {
+  var path = [];
+  _.each(steps, function(step) {
+    if(step.start_location) {
+      var startLatLng = new google.maps.LatLng(
+        step.start_location.lat, step.start_location.lon );
+      path.push(startLatLng);
+      var endLatLng = new google.maps.LatLng(
+          step.end_location.lat, step.end_location.lon);
+      path.push(endLatLng);
+    }
+  });
+
+  return path;
+};
+
+HopStopDirections.generateGoogleSteps = function(steps) {
+  var googleSteps = [];
+
+  _.each(steps, function(step) {
+    var googleStep = {};
+
+    googleStep.duration = step.duration;
+    googleStep.instructions = step.instructions;
+    googleStep.travel_mode = step.travel_mode;
+    googleStep.path = [];
+
+    if(step.start_location) {
+      googleStep.start_location = new google.maps.LatLng(step.start_location.lat, step.start_location.lon);
+      googleStep.path.push(googleStep.start_location);
+    }
+    if(step.end_location) {
+      googleStep.end_location = new google.maps.LatLng(step.end_location.lat, step.end_location.lon);
+      googleStep.path.push(googleStep.end_location);
+    }
+
+    googleSteps.push(googleStep);
+  });
+
+  return googleSteps;
+};
+
 
 // Events
-
-HopStopDirections.events.fetchHopStop = function(directions) {
-  return function(callback) {
-    var params = {
-      x1: directions.originLatLng.lng(), 
-      y1: directions.originLatLng.lat(), 
-      x2: directions.destinationLatLng.lng(), 
-      y2: directions.destinationLatLng.lat(), 
-      mode: directions.mode,
-      when: directions.when
-    };
-
-    HootrootApi.hopstop(params, callback);
-  };
-};
 
 HopStopDirections.events.processHopStop = function(directions, callback) {
   return function(err, results) {
     if(err) return callback(err, directions);
 
-    var directionsResult = { routes: [new GoogleDirectionsRoute(results.hopstop)] };
-    directions.storeRoute(directionsResult);
+    directions.storeRoute(HopStopDirections.translateRoute(results));
 
     err = null;
     if(directions.isAllWalkingSegments()) {
@@ -7335,32 +4726,13 @@ HopStopDirections.events.copyRoutedDirections = function(originalDirections, cal
     callback(null, originalDirections);
   };
 };
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/hop-stop-directions.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions/direct-bus-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/direct-bus-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/direct-bus-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions'),
+module.exports = HopStopDirections;
+
+});
+
+require.define("/lib/directions/direct-bus-directions.js", function (require, module, exports, __dirname, __filename) {
+var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
     GoogleDirectionsRoute = require('./google-directions-route'),
     NumberFormatter = require('../number-formatter');
@@ -7434,32 +4806,11 @@ DirectBusDirections.events.onGeocodeFinish = function(directions, callback) {
 };
 
 module.exports = DirectBusDirections;
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/direct-bus-directions.js"]._cached = module.exports;
-    return module.exports;
-};
 
-require.modules["/lib/directions/direct-rail-directions.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib/directions";
-    var __filename = "/lib/directions/direct-rail-directions.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib/directions");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib/directions");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
-    
-    (function () {
-        var Directions = require('../directions'),
+});
+
+require.define("/lib/directions/direct-rail-directions.js", function (require, module, exports, __dirname, __filename) {
+var Directions = require('../directions'),
     DirectionsEvents = require('../directions-events'),
     GoogleDirectionsRoute = require('./google-directions-route'),
     NumberFormatter = require('../number-formatter');
@@ -7517,15 +4868,18 @@ DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
       end_location: directions.destinationLatLng,
     }];
 
-    var directionsResult = { routes: [{
+    var route = {
+      overview_path: [directions.originLatLng, directions.destinationLatLng],
       legs: [{
         duration: { value: directions.duration() },
         distance: { value: directions.distanceInMeters },
         steps: steps
       }],
       warnings: [],
-      bounds: GoogleDirectionsRoute.generateBounds(steps)
-    }]};
+    };
+    route.bounds = GoogleDirectionsRoute.generateBounds(route.overview_path);
+
+    var directionsResult = { routes: [route]};
     directions.storeRoute(directionsResult);
 
     callback(null, directions);
@@ -7533,95 +4887,60 @@ DirectRailDirections.events.onGeocodeFinish = function(directions, callback) {
 };
 
 module.exports = DirectRailDirections;
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/directions/direct-rail-directions.js"]._cached = module.exports;
-    return module.exports;
+
+});
+
+require.define("/lib/hootroot-api.js", function (require, module, exports, __dirname, __filename) {
+var http = require('http');
+
+var HootrootApi = {};
+
+HootrootApi.HopStopError = function(message) {
+  this.prototype = Error.prototype;
+  this.name = 'HopStopError';
+  this.message = message;
 };
 
-require.modules["/lib/hootroot-api.js"] = function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/lib";
-    var __filename = "/lib/hootroot-api.js";
-    
-    var require = function (file) {
-        return __require(file, "/lib");
-    };
-    
-    require.resolve = function (file) {
-        return __require.resolve(name, "/lib");
-    };
-    
-    require.modules = __require.modules;
-    __require.modules["/lib/hootroot-api.js"]._cached = module.exports;
-    
-    (function () {
-        var http = require('http');
+HootrootApi.hopstop = function(params, callback) {
+  var query  = '?x1=' + params.x1;
+      query += '&y1=' + params.y1;
+      query += '&x2=' + params.x2;
+      query += '&y2=' + params.y2;
+      query += '&mode=' + params.mode;
+      query += '&when=' + params.when;
+  var request = http.request({
+    host: 'cm1-route.brighterplanet.com', port: 80, path: '/hopstops' + query,
+    method: 'GET',
+    headers: { 'Accept': 'application/json' }
+  }, function (response) {
+    if(response.statusCode >= 300) {
+      callback(new HootrootApi.HopStopError('Hopstop routing failed: ' + response.statusCode));
+    } else {
+      var data = '';
+      response.on('data', function (buf) {
+        data += buf;
+      });
+      response.on('error', function() {
+        callback(new HootrootApi.HopStopError('Hopstop routing failed: ' + data));
+      });
 
-var HootrootApi = module.exports = {
-  hopstop: function(params, callback) {
-    var query  = '?x1=' + params.x1;
-        query += '&y1=' + params.y1;
-        query += '&x2=' + params.x2;
-        query += '&y2=' + params.y2;
-        query += '&mode=' + params.mode;
-        query += '&when=' + params.when;
-    var request = http.request({
-      host: 'cm1-route.brighterplanet.com', port: 80, path: '/hopstops' + query,
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    }, function (response) {
-      if(response.statusCode >= 300) {
-        callback(new Error('HTTP request for Hopstop failed: ' + response.statusCode));
-      } else {
-        var data = '';
-        response.on('data', function (buf) {
-          data += buf;
-        });
-        response.on('error', function() { callback('HTTP request for Hopstop failed: ' + data) });
-
-        response.on('end', function () {
-          var json = JSON.parse(data);
-          callback(null, json);
-        });
-      }
-    });
-    request.end();
-
-    //var $ = require('jquery');
-
-    //$.ajax({
-      //url: '/hopstops',
-      //data: request,
-      //success: function(data) {
-        //callback(null, data);
-      //},
-      //error: callback
-    //});
-  }
-};
-;
-    }).call(module.exports);
-    
-    __require.modules["/lib/hootroot-api.js"]._cached = module.exports;
-    return module.exports;
+      response.on('end', function () {
+        var json = JSON.parse(data);
+        callback(null, json);
+      });
+    }
+  });
+  request.end();
 };
 
-require.alias("dkastner-http-browserify", "/node_modules/http");
+module.exports = HootrootApi;
 
-(function () {
-    var module = { exports : {} };
-    var exports = module.exports;
-    var __dirname = "/";
-    var __filename = "//Users/dkastner/cm1-route";
-    
-    var require = function (file) {
-        return __require(file, "/");
-    };
-    require.modules = __require.modules;
-    
-    Cm1Route = require('./lib/cm1-route');
-;
-})();
+});
+
+require.alias("http-browserify", "/node_modules/http");
+
+require.define("/browser.js", function (require, module, exports, __dirname, __filename) {
+    window.Cm1Route = require('./lib/cm1-route');
+
+});
+require("/browser.js");
