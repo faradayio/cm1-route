@@ -66,5 +66,46 @@ vows.describe('DirectionsEvents').addBatch({
         assert.equal(geocodedDirections.originLatLng, geocodedDirections.origin);
       }
     }
+  },
+
+  '#onSegmentGetEmissionEstimate': {
+    topic: { totalEmissions: 0 },
+
+    'on success': {
+      'with segment callback': {
+        topic: function(directions) {
+          var onSegmentGetEmissionEstimate = events.
+            onSegmentGetEmissionEstimate(directions, this.callback, function() {});
+          onSegmentGetEmissionEstimate(null, { carbon: 1 });
+        },
+
+        'sends the impacts to the segment callback': function(err, impacts) {
+          assert.equal(impacts.carbon, 1);
+        }
+      },
+      'without segment callback': {
+        topic: function(directions) {
+          var onSegmentGetEmissionEstimate = events.
+            onSegmentGetEmissionEstimate(directions, null, this.callback);
+          onSegmentGetEmissionEstimate(null, { carbon: 2 });
+        },
+
+        'increments totalEmissions': function(err, impacts) {
+          assert.isNull(err);
+        }
+      }
+    },
+
+    'on error': {
+      topic: function(directions) {
+        var onSegmentGetEmissionEstimate = events.
+            onSegmentGetEmissionEstimate(directions, null, this.callback);
+        onSegmentGetEmissionEstimate('failed', {});
+      },
+
+      'aborts async operation': function(err) {
+        assert.equal(err, 'failed');
+      }
+    }
   }
 }).export(module, { error: false });
