@@ -14,6 +14,7 @@
   "devDependencies": {
     "coffee-script": "*",
     "browserify": "*",
+    "fakeweb": "*",
     "http-browserify": "git://github.com/dkastner/http-browserify.git",
     "replay": "*",
     "sinon": "*",
@@ -25,5 +26,8 @@
   },
   "engines": {
     "node": "*"
+  },
+  "scripts": {
+    "test": "vows test/*-test.js"
   }
 }
