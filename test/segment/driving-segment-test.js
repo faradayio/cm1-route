@@ -8,7 +8,7 @@ var fakeweb = require('fakeweb'),
     http = require('http');
 http.register_intercept({
   uri: '/automobile_trips.json?distance=3401', 
-  host: 'impact.brighterplanet.com',
+  host: 'impact.brightercart.com',
   body: JSON.stringify({ decisions: { carbon: { object: { value: 6.8 } } } })
 });
 
@@ -25,13 +25,17 @@ vows.describe('DrivingSegment').addBatch({
     assert.equal(driving.duration, 3401);
   },
 
-  '#getImpacts': {
-    'passes an emissions parameter': function() {
-      var emissions;
-      driving.getImpacts(function(err, impacts) {
-        emissions = impacts.carbon;
-      });
-      assert.equal(emissions, 6.8);
+  '#impacts': {
+    topic: new DrivingSegment(0, {}),
+
+    'returns a value when only distance is given': function(car) {
+      car.distance = 10;
+      assert.isNumber(car.impacts().carbon);
+    },
+    'returns a value when fuelEfficency is given': function(car) {
+      car.distance = 10;
+      car.fuelEfficiency = 24.3;
+      assert.isNumber(car.impacts().carbon);
     }
   }
 }).export(module);

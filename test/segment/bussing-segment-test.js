@@ -12,5 +12,22 @@ vows.describe('BussingSegment').addBatch({
   'provides duration': function() {
     var bs = new BussingSegment(0, { duration: { value: 120 } });
     assert.equal(bs.duration, 120);
+  },
+  '#impacts': {
+    topic: new BussingSegment(0, { }),
+
+    'returns a value when distance is given': function(bus) {
+      bus.distance = 10;
+      assert.isNumber(bus.impacts().carbon);
+    },
+    'returns a value when duration is given': function(bus) {
+      bus.duration = 10;
+      assert.isNumber(bus.impacts().carbon);
+    },
+    'returns a value when bus class is given': function(bus) {
+      bus.distance = 10;
+      bus.busClass = 'regional';
+      assert.isNumber(bus.impacts().carbon);
+    }
   }
 }).export(module);
