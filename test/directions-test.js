@@ -24,23 +24,11 @@ vows.describe('Directions').addBatch({
     },
     
     'calls back with directions when all segments have calculated emissions': function(err, directions) {
+      console.log(err);
       assert.instanceOf(directions, Directions);
     },
     'calls back for each type of segment': function(err, directions) {
       assert.equal(directions.segmentEmissionsCallback.callCount, 1);
-    }
-  },
-
-  '.events': {
-    '.onSegmentGetEmissionEstimate': {
-      'updates the total emissions': function() {
-        var directions = new Directions('Lansing, MI', 'Ann Arbor, MI', 'DRIVING');
-        directions.storeRoute(GoogleResult.driving);
-        var evt = Directions.events.onSegmentGetEmissionEstimate(directions, sinon.stub(), sinon.stub());
-        directions.totalEmissions = 0;
-        evt(null, { carbon: 14254.4678 });
-        assert.approximately(directions.totalEmissions, 14254.46, 0.01);
-      }
     }
   },
 

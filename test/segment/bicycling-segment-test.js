@@ -14,13 +14,10 @@ vows.describe('BicyclingSegment').addBatch({
     assert.equal(bicycling.duration, 4800);
   },
 
-  '#getImpacts': {
-    'passes an emissions parameter': function() {
-      var emissions;
-      bicycling.getImpacts(function(err, impacts) {
-        emissions = impacts.carbon;
-      });
-      assert.equal(emissions, 0);
+  '#impacts': {
+    'returns emissions': function() {
+      var emissions = bicycling.impacts();
+      assert.equal(emissions.carbon, 0);
     }
   }
 }).export(module);

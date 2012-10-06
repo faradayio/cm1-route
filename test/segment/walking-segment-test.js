@@ -13,18 +13,15 @@ vows.describe('WalkingSegment').addBatch({
     var ws = new WalkingSegment(0, { duration: { value: 120 } });
     assert.equal(ws.duration, 120)
   },
-  '#getEmissionEstimate': {
+  '#impacts': {
     'results in zero emissions': function() {
       var walk = new WalkingSegment(0, {
         distance: { value: 28.5 },
         instructions: 'Go here' });
       
-      var emissions, step;
-      walk.getImpacts(function(err, impacts) {
-        emissions = impacts.carbon;
-      });
+      var emissions = walk.impacts();
 
-      assert.equal(emissions, 0);
+      assert.equal(emissions.carbon, 0);
     }
   }
 }).export(module);
