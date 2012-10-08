@@ -7,6 +7,7 @@
   "engine": "*",
   "dependencies": {
     "async": "*",
+    "jquery": "*",
     "JSON": "*",
     "underscore": "*"
   },

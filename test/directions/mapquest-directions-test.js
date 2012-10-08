@@ -35,6 +35,33 @@ vows.describe('MapquestDirections').addBatch({
     }
   },
 
+  '.shouldDefaultTransitToDirectRoute': {
+    'returns true for an AllWalkingSegmentsError and TRANSIT_DIRECT_DEFAULT env is true': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new MapquestDirections.AllWalkingSegmentsError('FAIL');
+      assert.isTrue(MapquestDirections.shouldDefaultTransitToDirectRoute(err));
+    },
+    'returns true for a MapquestError and TRANSIT_DIRECT_DEFAULT env is true': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new MapquestApi.MapquestError('FAIL');
+      assert.isTrue(MapquestDirections.shouldDefaultTransitToDirectRoute(err));
+    },
+    'returns false for null err': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      assert.isFalse(MapquestDirections.shouldDefaultTransitToDirectRoute(null));
+    },
+    'returns false for non-AllWalkingSegmentsError and non-MapquestError': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = true;
+      var err = new Error('LULZ');
+      assert.isFalse(MapquestDirections.shouldDefaultTransitToDirectRoute(null));
+    },
+    'returns false if TRANSIT_DIRECT_DEFAULT env is false': function() {
+      process.env.TRANSIT_DIRECT_DEFAULT = false;
+      var err = new MapquestDirections.AllWalkingSegmentsError('FAIL');
+      assert.isFalse(MapquestDirections.shouldDefaultTransitToDirectRoute(err));
+    }
+  },
+
   '.generateOverviewPath': {
     'converts a list of lat/lon numbers to google Lat/Lon objects': function() {
       var pairs = MapquestDirections.generateOverviewPath(mapquestResult.route.shape.shapePoints);
